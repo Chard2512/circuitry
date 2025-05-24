@@ -16,12 +16,13 @@ from uuid import uuid4
 from dataclasses import dataclass
 from typing import List, Dict, TypedDict, Optional, Union
 import math
+from enum import IntEnum
 import base64
 
 BIG_INT = 2147483647
 
 # Pre-defined block_id definitions
-class BlockID:
+class BlockID(IntEnum):
     NOR = 0
     AND = 1
     OR = 2
@@ -42,13 +43,6 @@ class BlockID:
     ANTENNA = 17
     CONDUCTOR_V2 = 18
     LED_MIXER = 19
-
-    @staticmethod
-    def get_name(value: int):
-        for name, val in BlockID.__dict__.items():
-            if not name.startswith('__') and val == value:
-                return name
-        return None
 
 @dataclass
 class Vector3:
@@ -141,7 +135,7 @@ class Block:
         return ",".join(savestring_table)
     
     def __repr__(self):
-        block_name = BlockID.get_name(self.block_id)
+        block_name = BlockID(self.block_id)
         return (
             f"Block("
             f"block_id=Enum.Block.{block_name},"
@@ -455,8 +449,8 @@ class Module:
 
         for c in self.connections.values():
             for n in c:
-                source_block_name = BlockID.get_name(self.blocks[n.source.uuid].block_id)
-                target_block_name = BlockID.get_name(self.blocks[n.target.uuid].block_id)
+                source_block_name = BlockID(self.blocks[n.source.uuid].block_id)
+                target_block_name = BlockID(self.blocks[n.target.uuid].block_id)
                 source_block_index = block_indexes[n.source.uuid]
                 target_block_index = block_indexes[n.target.uuid]
                 print(f"Connection({source_block_name} {source_block_index}, {target_block_name} {target_block_index})")
