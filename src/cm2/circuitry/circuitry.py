@@ -21,35 +21,34 @@ import base64
 BIG_INT = 2147483647
 
 # Pre-defined block_id definitions
-class Enum:
-    class Block:
-        NOR = 0
-        AND = 1
-        OR = 2
-        XOR = 3
-        BUTTON = 4
-        FLIPFLOP = 5
-        LED = 6
-        SOUND = 7
-        CONDUCTOR = 8
-        CUSTOM = 9
-        NAND = 10
-        XNOR = 11
-        RANDOM = 12
-        TEXT = 13
-        TILE = 14
-        NODE = 15
-        DELAY = 16
-        ANTENNA = 17
-        CONDUCTOR_V2 = 18
-        LED_MIXER = 19
+class BlockID:
+    NOR = 0
+    AND = 1
+    OR = 2
+    XOR = 3
+    BUTTON = 4
+    FLIPFLOP = 5
+    LED = 6
+    SOUND = 7
+    CONDUCTOR = 8
+    CUSTOM = 9
+    NAND = 10
+    XNOR = 11
+    RANDOM = 12
+    TEXT = 13
+    TILE = 14
+    NODE = 15
+    DELAY = 16
+    ANTENNA = 17
+    CONDUCTOR_V2 = 18
+    LED_MIXER = 19
 
-        @staticmethod
-        def get_name(value: int):
-            for name, val in Enum.Block.__dict__.items():
-                if not name.startswith('__') and val == value:
-                    return name
-            return None
+    @staticmethod
+    def get_name(value: int):
+        for name, val in BlockID.__dict__.items():
+            if not name.startswith('__') and val == value:
+                return name
+        return None
 
 @dataclass
 class Vector3:
@@ -142,7 +141,7 @@ class Block:
         return ",".join(savestring_table)
     
     def __repr__(self):
-        block_name = Enum.Block.get_name(self.block_id)
+        block_name = BlockID.get_name(self.block_id)
         return (
             f"Block("
             f"block_id=Enum.Block.{block_name},"
@@ -456,8 +455,8 @@ class Module:
 
         for c in self.connections.values():
             for n in c:
-                source_block_name = Enum.Block.get_name(self.blocks[n.source.uuid].block_id)
-                target_block_name = Enum.Block.get_name(self.blocks[n.target.uuid].block_id)
+                source_block_name = BlockID.get_name(self.blocks[n.source.uuid].block_id)
+                target_block_name = BlockID.get_name(self.blocks[n.target.uuid].block_id)
                 source_block_index = block_indexes[n.source.uuid]
                 target_block_index = block_indexes[n.target.uuid]
                 print(f"Connection({source_block_name} {source_block_index}, {target_block_name} {target_block_index})")
