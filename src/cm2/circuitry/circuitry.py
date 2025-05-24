@@ -10,13 +10,15 @@ __deprecated__ = False
 __license__ = "MIT"
 __maintainer__ = "Chard"
 __status__ = "Production"
-__version__ = "0.1.0-snapshot1"
+__version__ = "0.1.0-snapshot2"
 
 from uuid import uuid4
 from dataclasses import dataclass
 from typing import List, Dict, TypedDict, Optional, Union
 import math
 import base64
+
+BIG_INT = 2147483647
 
 # Pre-defined block_id definitions
 class Enum:
@@ -132,9 +134,9 @@ class Block:
         savestring_table = [
             str(self.block_id),
             ("1" if self.state else "0"),
-            str(self.pos.x),
-            str(self.pos.y),
-            str(self.pos.z),
+            str(round(self.pos.x, 3)),
+            str(round(self.pos.y, 3)),
+            str(round(self.pos.z, 3)),
             ("" if not self.properties else "+".join(self.properties))
         ]
         return ",".join(savestring_table)
@@ -165,18 +167,18 @@ class Connection:
 
 class ArrayInfo(TypedDict, total=False):
     snap_to_grid: bool
-    x_step: int
-    y_step: int
-    z_step: int
+    x_step: float
+    y_step: float
+    z_step: float
     x_cycle: int
     y_cycle: int
     z_cycle: int
     x_cluster: int
     y_cluster: int
     z_cluster: int
-    x_cluster_space: int
-    y_cluster_space: int
-    z_cluster_space: int
+    x_cluster_space: float
+    y_cluster_space: float
+    z_cluster_space: float
 
 class FindBlockInfo(TypedDict, total=False):
     block_id: Optional[int]
@@ -234,12 +236,12 @@ class Module:
             "x_step": 1,
             "y_step": 0,
             "z_step": 0,
-            "x_cycle": 4096,
-            "y_cycle": 4096,
-            "z_cycle": 4096,
-            "x_cluster": 4096,
-            "y_cluster": 4096,
-            "z_cluster": 4096,
+            "x_cycle": BIG_INT,
+            "y_cycle": BIG_INT,
+            "z_cycle": BIG_INT,
+            "x_cluster": BIG_INT,
+            "y_cluster": BIG_INT,
+            "z_cluster": BIG_INT,
             "x_cluster_space": 1,
             "y_cluster_space": 1,
             "z_cluster_space": 1
@@ -273,7 +275,7 @@ class Module:
             block_array.append(new_block)
         return block_array
 
-    def add_connection(self, source: Block, target: Block) -> Connection:
+    def connect_blocks(self, source: Block, target: Block) -> Connection:
         new_connection = Connection(source, target)
         if new_connection.target.uuid in self.connections:
             self.connections[new_connection.target.uuid].append(new_connection)
@@ -281,7 +283,7 @@ class Module:
             self.connections[new_connection.target.uuid] = [new_connection]
         return new_connection
     
-    def add_connection_pairs(
+    def connect_arrays(
             self, 
             source_array: List[Block], 
             target_array: List[Block], 
@@ -296,7 +298,12 @@ class Module:
             max_pairs = min(width, len(target_array))
         
         for i in range(max_pairs):
-            self.add_connection(source_array[i], target_array[i])
+            self.connect_blocks(source_array[i], target_array[i])
+
+    def connect_one_to_many(self, src: Block, targets: List[Block]) -> None:
+        """Connect one block to many (e.g., control signal to gates)."""
+        for target in targets:
+            self.connect_blocks(src, target)
 
     def delete_block(self, block: Block) -> None:
         """Delete a block from the save."""
@@ -432,7 +439,7 @@ class Module:
             values = connection_string.split(",")
             block1 = blocks[int(values[0]) - 1]
             block2 = blocks[int(values[1]) - 1]
-            self.add_connection(block1, block2)
+            self.connect_blocks(block1, block2)
 
         return self
     
