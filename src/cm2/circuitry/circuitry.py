@@ -14,7 +14,7 @@ __version__ = "0.1.0-snapshot2"
 
 from uuid import uuid4
 from dataclasses import dataclass
-from typing import List, Dict, TypedDict, Optional, Union
+from typing import List, TypedDict, Optional, Union, Tuple
 import math
 from enum import IntEnum
 import base64
@@ -188,18 +188,25 @@ class Module:
         self.blocks = {}
         self.connections = {}
         self.buildings = {}
-        
+
     def add_block(
         self,
-        block_id: int,
-        pos: Vector3,
+        block_id: Union[int, str, BlockID],
+        pos: Tuple[float, float, float] | Vector3,
         state: bool = False,
         properties: Optional[List[Union[int, float]]] = None,
         snap_to_grid: bool = True,
     ) -> Block:
+        if isinstance(pos, tuple):
+            pos = Vector3(*pos)
         """Add a block to the save."""
+        if isinstance(block_id, str):
+            block_id = BlockID[block_id.upper()]
+        if isinstance(block_id, BlockID):
+            block_id = block_id.value
+
         if snap_to_grid:
-            newBlock = Block(
+            new_block = Block(
                 block_id,
                 Vector3(
                     int(round(pos.x, 0)),
@@ -210,19 +217,27 @@ class Module:
                 properties=properties,
             )
         else:
-            newBlock = Block(block_id, pos, state=state, properties=properties)
-        self.blocks[newBlock.uuid] = newBlock
-        return newBlock
+            new_block = Block(block_id, pos, state=state, properties=properties)
+        self.blocks[new_block.uuid] = new_block
+        return new_block
     
     def add_array(
         self,
         width: int,
-        block_id: int,
-        pos: Vector3,
+        block_id: Union[int, str, BlockID] ,
+        pos: Tuple[float, float, float] | Vector3,
         state: bool = False,
         properties: Optional[List[Union[int, float]]] = None,
         info: Optional[ArrayInfo] = None
     ) -> List[Block]:
+        if isinstance(block_id, str):
+            block_id = BlockID[block_id.upper()]
+        if isinstance(block_id, BlockID):
+            block_id = block_id.value
+
+        if isinstance(pos, tuple):
+            pos = Vector3(*pos)
+
         """Add a block to the save."""
         default_info: ArrayInfo = {
             "snap_to_grid": True,
@@ -454,3 +469,49 @@ class Module:
                 source_block_index = block_indexes[n.source.uuid]
                 target_block_index = block_indexes[n.target.uuid]
                 print(f"Connection({source_block_name} {source_block_index}, {target_block_name} {target_block_index})")
+
+class CircuitBuilder:
+    def __init__(self, module: Module):
+        self.module = module
+        self.named_components = {}  # Track named components for easy access
+
+    def add(
+        self,
+        label: str = "",
+        component_type: str = "block", 
+        pos: Tuple[float, float, float] | Vector3 = (0, 0, 0), 
+        block_id: Union[int, str, BlockID] = 0, 
+        width = 1, 
+        **kwargs):
+        """Generalized method to add blocks/arrays."""
+        if width > 1 or component_type == "array":
+            blocks = self.module.add_array(
+                width=width,
+                block_id=block_id,
+                pos=pos,
+                **kwargs
+            )
+        else:
+            blocks = self.module.add_block(block_id, pos, **kwargs)
+
+        self.named_components[label] = blocks
+        return self
+
+    def connect(self, source: str = "", target: str = "", width: Optional[int]=None):
+        """Generalized connection method."""
+        src = self._get_component(source)
+        tgt = self._get_component(target)
+        
+        if isinstance(src, list) and isinstance(tgt, list):
+            self.module.connect_arrays(src, tgt, width)
+        elif isinstance(tgt, list):
+            self.module.connect_one_to_many(src, tgt)
+        else:
+            self.module.connect_blocks(src, tgt)
+        return self
+
+    def _get_component(self, ref) -> Block:
+        """Resolve component reference (name string or object)"""
+        if isinstance(ref, str):
+            return self.named_components[ref]
+        return ref
