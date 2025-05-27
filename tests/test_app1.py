@@ -1,7 +1,7 @@
 from src.cm2.circuitry import *
 
 def test_add_block():
-    m = Module()
+    m = Module("main")
 
     m.add([
         Block("input", "node", (0, 0, 0))
@@ -10,7 +10,7 @@ def test_add_block():
     print(m.blocks)
 
 def test_add_array():
-    m = Module()
+    m = Module("main")
 
     m.add([
         Array("input", 16, "node", (0, 0, 0))
@@ -19,7 +19,7 @@ def test_add_array():
     print(m.blocks)
 
 def test_connect():
-    m = Module()
+    m = Module("main")
 
     m.add([
         Block("input", "node", (0, 0, 0)),
@@ -30,7 +30,7 @@ def test_connect():
     m.save("tests/file.txt")
 
 def test_connect_array():
-    m = Module()
+    m = Module("main")
 
     m.add([
         Block("input", "node", (0, 0, 0)),

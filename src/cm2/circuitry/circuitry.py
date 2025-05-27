@@ -14,7 +14,7 @@ __version__ = "0.1.0-snapshot2"
 
 from uuid import uuid4
 from dataclasses import dataclass
-from typing import List, TypedDict, Optional, Tuple, Dict
+from typing import List, TypedDict, Optional, Tuple, Dict, Union
 import math
 from enum import IntEnum
 import base64
@@ -214,7 +214,6 @@ class Array:
 
 class Wire:
     def __init__(self, src: str, dst: str):
-        self.type = type
         self.src = src
         self.dst = dst
 
@@ -243,14 +242,15 @@ class Module:
     """
     Base module class.
     """
-    def __init__(self):
+    def __init__(self, name: Optional[str]="main"):
+        self.name = name
         self.blocks = {}
         self.wires = {}
         self.buildings = {}
 
     def add(
         self,
-        components: List[Block | Array | Wire]
+        components: List[Union[Block, Array, Wire, "Module"]]
     ):
         for c in components:
             if isinstance(c, Block | Array):
@@ -269,6 +269,14 @@ class Module:
                             self.wires[f"{c.src}->{c.dst}{i}"] = Wire(f"{c.src}", f"{c.dst}{i}")
                     elif isinstance(dst, Block):
                         self.wires[f"{c.src}->{c.dst}"] = c
+            if isinstance(c, Module):
+                self.merge(c)
+
+    def move(self, move_vector: Tuple[float, float, float] | Vector3):
+        if isinstance(move_vector, Tuple):
+            move_vector = Vector3(*move_vector)
+        for c in self.blocks.values():
+            c.pos += move_vector
 
     def get_block_indexes(self):
         block_indexes = {}
@@ -364,9 +372,11 @@ class Module:
         return self
     
     def merge(self, other: 'Module'):
-        self.blocks.update(other.blocks)
-        self.wires.update(other.wires)
-        self.buildings.update(other.buildings)
+        for name, component in other.blocks.items():
+            component.name = f"{other.name}.{component.name}"
+            self.blocks[f"{other.name}.{name}"] = component
+        for name, wire in other.wires.items():
+            self.wires[f"{other.name}.{name}"] = Wire(f"{other.name}.{wire.src}", f"{other.name}.{wire.dst}")
 
     def show_components(self):
         block_indexes = self.get_block_indexes()
