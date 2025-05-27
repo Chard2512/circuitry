@@ -10,14 +10,12 @@ __deprecated__ = False
 __license__ = "MIT"
 __maintainer__ = "Chard"
 __status__ = "Production"
-__version__ = "0.1.0-snapshot2"
+__version__ = "0.1.0-snapshot3"
 
-from uuid import uuid4
 from dataclasses import dataclass
 from typing import List, TypedDict, Optional, Tuple, Dict, Union
 import math
 from enum import IntEnum
-import base64
 
 BIG_INT = 2147483647
 
@@ -389,16 +387,12 @@ class Module:
         for name, wire in other.wires.items():
             self.wires[f"{other.name}.{name}"] = Wire(f"{other.name}.{wire.src}", f"{other.name}.{wire.dst}")
 
-    def show_components(self):
+    def show_components(self, wires=False):
         block_indexes = self.get_block_indexes()
 
-        for i, b in enumerate(self.blocks.values()):
-            print(f"{i + 1}: {b}")
+        for k, b in self.blocks.items():
+            print(f"{k}: {b}")
 
-        for c in self.wires.values():
-            for n in c:
-                src_block_name = BlockID(self.blocks[n.src.name].block_id)
-                dst_block_name = BlockID(self.blocks[n.dst.name].block_id)
-                src_block_index = block_indexes[n.src.name]
-                dst_block_index = block_indexes[n.dst.name]
-                print(f"Wire({src_block_name} {src_block_index}, {dst_block_name} {dst_block_index})")
+        if wires:
+            for k, w in self.wires.items():
+                print(f"{k}: {w}")
