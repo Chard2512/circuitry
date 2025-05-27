@@ -5,19 +5,21 @@ Circuit Maker 2 library for savestring generation and manipulation
 __author__ = "Chard"
 __contact__ = "chardson.coelho17@gmail.com"
 __copyright__ = "Copyright 2025, Chard2512"
-__date__ = "2025/05/23"
+__date__ = "2025/05/27"
 __deprecated__ = False
 __license__ = "MIT"
 __maintainer__ = "Chard"
 __status__ = "Production"
-__version__ = "0.1.0-snapshot2"
+__version__ = "0.1.0-snapshot3"
 
-from uuid import uuid4
 from dataclasses import dataclass
+<<<<<<< HEAD
 from typing import List, TypedDict, Optional, Union, Tuple
+=======
+from typing import List, TypedDict, Optional, Tuple, Dict, Union
+>>>>>>> trying-idea
 import math
 from enum import IntEnum
-import base64
 
 BIG_INT = 2147483647
 
@@ -52,8 +54,12 @@ class Vector3:
     z: float
 
     @staticmethod
-    def zero():
+    def zeros():
         return Vector3(0, 0, 0)
+    
+    @staticmethod
+    def ones():
+        return Vector3(1, 1, 1)
 
     def normalize(self):
         length = math.sqrt(self.x**2 + self.y**2 + self.z**2)
@@ -66,12 +72,35 @@ class Vector3:
             self.x * other.y - self.y * other.x
         )
 
+    def elementwise_min(self, other: 'Vector3') -> 'Vector3':
+        return Vector3(
+            min(self.x, other.x),
+            min(self.y, other.y),
+            min(self.z, other.z)
+        )
+
+    def elementwise_max(self, other: 'Vector3') -> 'Vector3':
+        return Vector3(
+            max(self.x, other.x),
+            max(self.y, other.y),
+            max(self.z, other.z)
+        )
+
     def __add__(self, other):
         return Vector3(self.x + other.x, self.y + other.y, self.z + other.z)
 
     def __sub__(self, other):
         return Vector3(self.x - other.x, self.y - other.y, self.z - other.z)
-
+    
+    def __truediv__(self, other):
+        return Vector3(self.x / other, self.y / other, self.z / other)
+    
+    def __mul__(self, other):
+        return Vector3(self.x * other, self.y * other, self.z * other)
+    
+    def __round__(self, ndigits=0):
+        return Vector3(round(self.x, ndigits), round(self.y, ndigits), round(self.z, ndigits))
+    
 @dataclass
 class CFrame:
     """Data class to represent position and rotation"""
@@ -106,26 +135,25 @@ class CFrame:
         return f"CFrame(pos={self.position}, rot={self.rotation})"
 
 class Block:
-    def __init__(self, block_id: int, pos: Vector3, state=False, properties=None):
-        assert (
-            isinstance(block_id, int) and 0 <= block_id <= 19
-        ), "blockId must be an integer between 0 and 19"
-        assert (
-            isinstance(pos, Vector3)
-        ), "pos must be a Vector3"
-        assert isinstance(state, bool), "state must be a boolean"
-        assert (
-            isinstance(properties, list) or properties is None
-        ), "properties must be a list of numbers, or None."
+    def __init__(
+            self, 
+            name: str, 
+            block_id: str, 
+            pos: Tuple[float, float, float] | Vector3, 
+            state=False, 
+            properties=None
+    ):
+        if isinstance(pos, Tuple):
+            pos = Vector3(*pos)
+        self.name = name
         self.block_id = block_id
         self.state = state
         self.pos = pos
         self.properties = properties
-        self.uuid = str(uuid4())
 
     def savestring_encode(self):
         savestring_table = [
-            str(self.block_id),
+            str(BlockID[str.upper(self.block_id)]),
             ("1" if self.state else "0"),
             str(round(self.pos.x, 3)),
             str(round(self.pos.y, 3)),
@@ -135,28 +163,94 @@ class Block:
         return ",".join(savestring_table)
     
     def __repr__(self):
-        block_name = BlockID(self.block_id)
         return (
             f"Block("
-            f"block_id=Enum.Block.{block_name},"
+            f"block_id={str.upper(self.block_id)},"
             f"state={self.state},"
             f"pos={self.pos},"
-            f"properties={self.properties},"
-            f"uuid={self.uuid[:2]}..."
+            f"properties={self.properties}"
             f")"
         )
-class Connection:
-    def __init__(self, source, target):
-        assert isinstance(source, Block), "source must be a Block object"
-        assert isinstance(target, Block), "target must be a Block object"
-        self.source = source
-        self.target = target
+
+class Array:
+    def __init__(
+        self, 
+        name: str, 
+        width: int, 
+        block_id: str, 
+        pos: Tuple[float, float, float] | Vector3,
+        info: Optional["ArrayInfo"]=None,
+        state=False, 
+        properties=None
+    ):
+        if isinstance(pos, Tuple):
+            pos = Vector3(*pos)
+        self.name = name
+        self.width = width 
+        self.block_id = block_id
+        self.pos = pos
+        self.state = state
+        self.properties = properties
+        default_info: ArrayInfo = {
+                "snap_to_grid": True,
+                "x_step": 1,
+                "y_step": 0,
+                "z_step": 0,
+                "x_cycle": BIG_INT,
+                "y_cycle": BIG_INT,
+                "z_cycle": BIG_INT,
+                "x_cluster": BIG_INT,
+                "y_cluster": BIG_INT,
+                "z_cluster": BIG_INT,
+                "x_cluster_space": 1,
+                "y_cluster_space": 1,
+                "z_cluster_space": 1
+            }
+        if info is not None:
+            default_info.update(info)
+        self.info = default_info
+
+    def get_blocks(self) -> Dict:
+        blocks = {}
+        info = self.info
+        for i in range(self.width):
+            pos_offset = Vector3(
+                (info["x_step"] * i  + info["x_cluster_space"] * (i // info["x_cluster"])) % info["x_cycle"],
+                (info["y_step"] * i  + info["y_cluster_space"] * (i // info["y_cluster"])) % info["y_cycle"],
+                (info["z_step"] * i  + info["z_cluster_space"] * (i // info["z_cluster"])) % info["z_cycle"],
+            )
+            block_pos = self.pos + pos_offset
+            blocks[f"{self.name}{i}"] = Block(
+                f"{self.name}{i}",
+                self.block_id,
+                block_pos,
+                self.state,
+                self.properties
+            )
+        
+        return blocks
+
+    def __repr__(self):
+        return (
+            f"Array("
+            f"width={self.width},"
+            f"block_id={str.upper(self.block_id)},"
+            f"state={self.state},"
+            f"pos={self.pos},"
+            f"properties={self.properties}"
+            f")"
+        )
+
+class Wire:
+    def __init__(self, src: str, dst: str):
+        self.src = src
+        self.dst = dst
 
     def savestring_encode(self, block_indexes):
-        return f"{block_indexes[self.source.uuid]},{block_indexes[self.target.uuid]}"
+        return f"{block_indexes[self.src]},{block_indexes[self.dst]}"
     
     def __repr__(self):
-        return f"Connection(source={self.source.uuid[:2]}...,target={self.target.uuid[:2]}...)"
+        return f"Wire(src={self.src},dst={self.dst})"
 
 class ArrayInfo(TypedDict, total=False):
     snap_to_grid: bool
@@ -173,345 +267,136 @@ class ArrayInfo(TypedDict, total=False):
     y_cluster_space: float
     z_cluster_space: float
 
-class FindBlockInfo(TypedDict, total=False):
-    block_id: Optional[int]
-    search_box_pos: Optional[Vector3]
-    search_box_dim: Optional[Vector3]
-    state: Optional[bool]
-    properties: Optional[List]
-
 class Module:
     """
     Base module class.
     """
-    def __init__(self):
+    def __init__(self, name: Optional[str]="main"):
+        self.name = name
         self.blocks = {}
-        self.connections = {}
+        self.wires = {}
         self.buildings = {}
 
-    def add_block(
+    def add(
         self,
-        block_id: Union[int, str, BlockID],
-        pos: Tuple[float, float, float] | Vector3,
-        state: bool = False,
-        properties: Optional[List[Union[int, float]]] = None,
-        snap_to_grid: bool = True,
-    ) -> Block:
-        if isinstance(pos, tuple):
-            pos = Vector3(*pos)
-        """Add a block to the save."""
-        if isinstance(block_id, str):
-            block_id = BlockID[block_id.upper()]
-        if isinstance(block_id, BlockID):
-            block_id = block_id.value
+        components: List[Union[Block, Array, Wire, "Module"]]
+    ):
+        for c in components:
+            if isinstance(c, Block | Array):
+                self.blocks[c.name] = c
+            if isinstance(c, Wire):
+                if c.src in self.blocks:
+                    src = self.blocks[c.src]
+                else:
+                    src = Block("", "", (0, 0, 0)) # Trust that it is from an array to be developed
+                if c.dst in self.blocks:
+                    dst = self.blocks[c.dst]
+                else:
+                    dst = Block("", "", (0, 0, 0)) # Trust that it is from an array to be developed
+                if isinstance(src, Array):
+                    if isinstance(dst, Array):
+                        max_pairs = min(src.width, dst.width)
+                        for i in range(max_pairs):
+                            self.wires[f"{c.src}{i}->{c.dst}{i}"] = Wire(f"{c.src}{i}", f"{c.dst}{i}")
+                elif isinstance(src, Block):
+                    if isinstance(dst, Array):
+                        for i in range(dst.width):
+                            self.wires[f"{c.src}->{c.dst}{i}"] = Wire(f"{c.src}", f"{c.dst}{i}")
+                    elif isinstance(dst, Block):
+                        self.wires[f"{c.src}->{c.dst}"] = c
+            if isinstance(c, Module):
+                self.merge(c)
 
-        if snap_to_grid:
-            new_block = Block(
-                block_id,
-                Vector3(
-                    int(round(pos.x, 0)),
-                    int(round(pos.y, 0)),
-                    int(round(pos.z, 0)),
-                ),
-                state=state,
-                properties=properties,
-            )
-        else:
-            new_block = Block(block_id, pos, state=state, properties=properties)
-        self.blocks[new_block.uuid] = new_block
-        return new_block
-    
-    def add_array(
-        self,
-        width: int,
-        block_id: Union[int, str, BlockID] ,
-        pos: Tuple[float, float, float] | Vector3,
-        state: bool = False,
-        properties: Optional[List[Union[int, float]]] = None,
-        info: Optional[ArrayInfo] = None
-    ) -> List[Block]:
-        if isinstance(block_id, str):
-            block_id = BlockID[block_id.upper()]
-        if isinstance(block_id, BlockID):
-            block_id = block_id.value
+    def move(self, move_vector: Tuple[float, float, float] | Vector3):
+        if isinstance(move_vector, Tuple):
+            move_vector = Vector3(*move_vector)
+        for c in self.blocks.values():
+            c.pos += move_vector
 
-        if isinstance(pos, tuple):
-            pos = Vector3(*pos)
+    def get_center(self, ndigits=0) -> Vector3:
+        blocks = self.get_blocks()
+        mean = Vector3(0, 0, 0)
+        for block in blocks:
+            mean += block.pos / len(blocks)
 
-        """Add a block to the save."""
-        default_info: ArrayInfo = {
-            "snap_to_grid": True,
-            "x_step": 1,
-            "y_step": 0,
-            "z_step": 0,
-            "x_cycle": BIG_INT,
-            "y_cycle": BIG_INT,
-            "z_cycle": BIG_INT,
-            "x_cluster": BIG_INT,
-            "y_cluster": BIG_INT,
-            "z_cluster": BIG_INT,
-            "x_cluster_space": 1,
-            "y_cluster_space": 1,
-            "z_cluster_space": 1
-        }
+        return round(mean, ndigits)
 
-        if info is not None:
-            default_info.update(info)
-        info = default_info
-
-        block_array = []
-        for i in range(width):
-            pos_offset = Vector3(
-                (info["x_step"] * i  + info["x_cluster_space"] * (i // info["x_cluster"])) % info["x_cycle"],
-                (info["y_step"] * i  + info["y_cluster_space"] * (i // info["y_cluster"])) % info["y_cycle"],
-                (info["z_step"] * i  + info["z_cluster_space"] * (i // info["z_cluster"])) % info["z_cycle"],
-            )
-            if info["snap_to_grid"]:
-                new_block = Block(
-                    block_id,
-                    Vector3(
-                        int(round(pos.x + pos_offset.x, 0)),
-                        int(round(pos.y + pos_offset.y, 0)),
-                        int(round(pos.z + pos_offset.z, 0)),
-                    ),
-                    state=state,
-                    properties=properties,
-                )
-            else:
-                new_block = Block(block_id, pos + pos_offset, state=state, properties=properties)
-            self.blocks[new_block.uuid] = new_block
-            block_array.append(new_block)
-        return block_array
-
-    def connect_blocks(self, source: Block, target: Block) -> Connection:
-        new_connection = Connection(source, target)
-        if new_connection.target.uuid in self.connections:
-            self.connections[new_connection.target.uuid].append(new_connection)
-        else:
-            self.connections[new_connection.target.uuid] = [new_connection]
-        return new_connection
-    
-    def connect_arrays(
-            self, 
-            source_array: List[Block], 
-            target_array: List[Block], 
-            width: Optional[int] = None
-    ) -> None:    
-        if width is None:
-            max_pairs = min(len(source_array), len(target_array))
-        else:
-            assert isinstance(width, int), "width should be an integer"
-            assert width <= len(source_array), "width shouldn't be greater than source array length"
-            assert width > 0, "width cannot be less than 1"
-            max_pairs = min(width, len(target_array))
-        
-        for i in range(max_pairs):
-            self.connect_blocks(source_array[i], target_array[i])
-
-    def connect_one_to_many(self, src: Block, targets: List[Block]) -> None:
-        """Connect one block to many (e.g., control signal to gates)."""
-        for target in targets:
-            self.connect_blocks(src, target)
-
-    def delete_block(self, block: Block) -> None:
-        """Delete a block from the save."""
-        assert isinstance(block, Block), "block must be a Block object"
-        assert block.uuid in self.blocks, "block does not exist in save"
-        to_remove = []
-        for key, conn_list in self.connections.items():
-            self.connections[key] = [c for c in conn_list if c.source.uuid != block.uuid and c.target.uuid != block.uuid]
-            if not self.connections[key]:
-                to_remove.append(key)
-        # Remove keys with empty connection lists
-        for key in to_remove:
-            del self.connections[key]
-            
-        del self.blocks[block.uuid]
-        return
-
-    def delete_connection(self, connection: Connection) -> None:
-        """Delete a connection from the save."""
-        assert isinstance(
-            connection, Connection
-        ), "connection must be a Connection object"
-        assert connection in (n for c in self.connections.values() for n in c)
-        for c in self.connections.values():
-            for n in c:
-                if connection == n:
-                    del self.connections[n.target.uuid][
-                        self.connections[n.target.uuid].index(n)
-                    ]
-
-    def find_block(self, criteria: FindBlockInfo) -> List[Block]:
-        default_info: FindBlockInfo = {
-            "block_id": None,
-            "search_box_pos": None,
-            "search_box_dim": None,
-            "state": None,
-            "properties": None,
-        }
-
-        if criteria is not None:
-            default_info.update(criteria)
-        criteria = default_info
-
-        found_blocks = []
-
-        for block in self.blocks.values():
-            if criteria["block_id"] is not None and block.block_id != criteria["block_id"]:
-                continue
-            if criteria["properties"] is not None and block.properties != criteria["properties"]:
-                continue
-            if criteria["state"] is not None and block.state != criteria["state"]:
-                continue
-            if criteria["search_box_pos"] is not None:
-                dim = criteria["search_box_dim"] or Vector3.zero()
-                start = criteria["search_box_pos"]
-                end = start + dim
-                if not (min(start.x, end.x) <= block.pos.x <= max(start.x, end.x)):
-                    continue
-                if not (min(start.y, end.y) <= block.pos.y <= max(start.y, end.y)):
-                    continue
-                if not (min(start.z, end.z) <= block.pos.z <= max(start.z, end.z)):
-                    continue
-            found_blocks.append(block)
-
-        return found_blocks
+    def get_dimensions(self):
+        blocks = self.get_blocks()
+        min_v = Vector3(0, 0, 0)
+        max_v = Vector3(0, 0, 0)
+        for block in blocks:
+            min_v = min_v.elementwise_min(block.pos)
+            max_v = max_v.elementwise_max(block.pos)
+        dims = (max_v - min_v) + Vector3.ones()
+        return dims
 
     def get_block_indexes(self):
         block_indexes = {}
 
         index = 1
-        for b in self.blocks.values():
-            block_indexes[b.uuid] = index
-            index += 1
+        for c in self.blocks.values():
+            if isinstance(c, Block):
+                block_indexes[c.name] = index
+                index += 1
+            if isinstance(c, Array):
+                array_blocks = c.get_blocks()
+                for b in array_blocks.values():
+                    block_indexes[b.name] = index
+                    index += 1
 
         return block_indexes
+    
+    def get_blocks(self):
+        blocks = []
+        for c in self.blocks.values():
+            if isinstance(c, Block):
+                blocks.append(c)
+            if isinstance(c, Array):
+                array_blocks = c.get_blocks()
+                for b in array_blocks.values():
+                    blocks.append(b)
+
+        return blocks
+
+    def get_wires(self):
+        wires = []
+        for w in self.wires.values():
+            wires.append(w)
+        return wires
 
     def save(self, path):
         """Export module as a Circuit Maker 2 save string."""
-        block_table = []
-        connection_table = []
+        block_list = self.get_blocks()
+        block_indexes = self.get_block_indexes()
+        wire_list = self.get_wires()
+        block_table = [b.savestring_encode() for b in block_list]
+        wire_table = [w.savestring_encode(block_indexes) for w in wire_list]
         #building_table = []
         #data_table = []
-        block_indexes = self.get_block_indexes()
-
-        for b in self.blocks.values():
-            block_table.append(b.savestring_encode())
-
-        for c in self.connections.values():
-            for n in c:
-                connection_table.append(n.savestring_encode(block_indexes))
         
         # TODO: Custom build and data support
 
-        string = ";".join(block_table) + "?" + ";".join(connection_table) + "??"
+        string = ";".join(block_table) + "?" + ";".join(wire_table) + "??"
         
         with open(path, "w") as file:
             file.write(string)
 
         return string
-
-    def load(self, path: str, snap_to_grid=True) -> 'Module':
-        """Import a Circuit Maker 2 save string as a module."""
-
-        with open(path, "r") as file:
-            string = file.read()
-
-        sections = string.split("?")
-        block_strings = sections[0].split(";")
-        connection_strings = sections[1].split(";")
-
-        blocks = []
-        for block_string in block_strings:
-            values = block_string.split(",")
-            block_id = int(values[0])
-            state = (values[1] == "1")
-            pos = Vector3(float(values[2]), float(values[3]), float(values[4]))
-            properties = []
-            for v in values[5].split("+"):
-                if v:
-                    properties.append(float(v))
-            if properties == []:
-                properties = None
-
-            blocks.append(self.add_block(
-                block_id,
-                pos,
-                state,
-                properties,
-                snap_to_grid
-            ))
-
-        for connection_string in connection_strings:
-            values = connection_string.split(",")
-            block1 = blocks[int(values[0]) - 1]
-            block2 = blocks[int(values[1]) - 1]
-            self.connect_blocks(block1, block2)
-
-        return self
     
     def merge(self, other: 'Module'):
-        self.blocks.update(other.blocks)
-        self.connections.update(other.connections)
-        self.buildings.update(other.buildings)
+        for name, component in other.blocks.items():
+            component.name = f"{other.name}.{component.name}"
+            self.blocks[f"{other.name}.{name}"] = component
+        for name, wire in other.wires.items():
+            self.wires[f"{other.name}.{name}"] = Wire(f"{other.name}.{wire.src}", f"{other.name}.{wire.dst}")
 
-    def show_components(self):
+    def show_components(self, wires=False):
         block_indexes = self.get_block_indexes()
 
-        for i, b in enumerate(self.blocks.values()):
-            print(f"{i + 1}: {b}")
+        for k, b in self.blocks.items():
+            print(f"{k}: {b}")
 
-        for c in self.connections.values():
-            for n in c:
-                source_block_name = BlockID(self.blocks[n.source.uuid].block_id)
-                target_block_name = BlockID(self.blocks[n.target.uuid].block_id)
-                source_block_index = block_indexes[n.source.uuid]
-                target_block_index = block_indexes[n.target.uuid]
-                print(f"Connection({source_block_name} {source_block_index}, {target_block_name} {target_block_index})")
-
-class CircuitBuilder:
-    def __init__(self, module: Module):
-        self.module = module
-        self.named_components = {}  # Track named components for easy access
-
-    def add(
-        self,
-        label: str = "",
-        component_type: str = "block", 
-        pos: Tuple[float, float, float] | Vector3 = (0, 0, 0), 
-        block_id: Union[int, str, BlockID] = 0, 
-        width = 1, 
-        **kwargs):
-        """Generalized method to add blocks/arrays."""
-        if width > 1 or component_type == "array":
-            blocks = self.module.add_array(
-                width=width,
-                block_id=block_id,
-                pos=pos,
-                **kwargs
-            )
-        else:
-            blocks = self.module.add_block(block_id, pos, **kwargs)
-
-        self.named_components[label] = blocks
-        return self
-
-    def connect(self, source: str = "", target: str = "", width: Optional[int]=None):
-        """Generalized connection method."""
-        src = self._get_component(source)
-        tgt = self._get_component(target)
-        
-        if isinstance(src, list) and isinstance(tgt, list):
-            self.module.connect_arrays(src, tgt, width)
-        elif isinstance(tgt, list):
-            self.module.connect_one_to_many(src, tgt)
-        else:
-            self.module.connect_blocks(src, tgt)
-        return self
-
-    def _get_component(self, ref) -> Block:
-        """Resolve component reference (name string or object)"""
-        if isinstance(ref, str):
-            return self.named_components[ref]
-        return ref
+        if wires:
+            for k, w in self.wires.items():
+                print(f"{k}: {w}")
