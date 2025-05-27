@@ -388,8 +388,6 @@ class Module:
             self.wires[f"{other.name}.{name}"] = Wire(f"{other.name}.{wire.src}", f"{other.name}.{wire.dst}")
 
     def show_components(self, wires=False):
-        block_indexes = self.get_block_indexes()
-
         for k, b in self.blocks.items():
             print(f"{k}: {b}")
 
