@@ -13,11 +13,7 @@ __status__ = "Production"
 __version__ = "0.1.0-snapshot3"
 
 from dataclasses import dataclass
-<<<<<<< HEAD
-from typing import List, TypedDict, Optional, Union, Tuple
-=======
 from typing import List, TypedDict, Optional, Tuple, Dict, Union
->>>>>>> trying-idea
 import math
 from enum import IntEnum
 
