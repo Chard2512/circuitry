@@ -14,7 +14,7 @@ __version__ = "0.1.0-snapshot2"
 
 from uuid import uuid4
 from dataclasses import dataclass
-from typing import List, TypedDict, Optional, Tuple, Union
+from typing import List, TypedDict, Optional, Tuple, Dict
 import math
 from enum import IntEnum
 import base64
@@ -124,7 +124,7 @@ class Block:
 
     def savestring_encode(self):
         savestring_table = [
-            BlockID[str.upper(self.block_id)],
+            str(BlockID[str.upper(self.block_id)]),
             ("1" if self.state else "0"),
             str(round(self.pos.x, 3)),
             str(round(self.pos.y, 3)),
@@ -181,8 +181,40 @@ class Array:
             default_info.update(array_info)
         self.array_info = default_info
 
+    def get_blocks(self) -> Dict:
+        blocks = {}
+        info = self.array_info
+        for i in range(self.width):
+            pos_offset = Vector3(
+                (info["x_step"] * i  + info["x_cluster_space"] * (i // info["x_cluster"])) % info["x_cycle"],
+                (info["y_step"] * i  + info["y_cluster_space"] * (i // info["y_cluster"])) % info["y_cycle"],
+                (info["z_step"] * i  + info["z_cluster_space"] * (i // info["z_cluster"])) % info["z_cycle"],
+            )
+            block_pos = self.pos + pos_offset
+            blocks[f"{self.name}{i}"] = Block(
+                f"{self.name}{i}",
+                self.block_id,
+                block_pos,
+                self.state,
+                self.properties
+            )
+        
+        return blocks
+
+    def __repr__(self):
+        return (
+            f"Array("
+            f"width={self.width},"
+            f"block_id={str.upper(self.block_id)},"
+            f"state={self.state},"
+            f"pos={self.pos},"
+            f"properties={self.properties}"
+            f")"
+        )
+
 class Wire:
     def __init__(self, src: str, dst: str):
+        self.type = type
         self.src = src
         self.dst = dst
 
@@ -190,7 +222,7 @@ class Wire:
         return f"{block_indexes[self.src]},{block_indexes[self.dst]}"
     
     def __repr__(self):
-        return f"Wire(src={self.src}...,dst={self.dst}...)"
+        return f"Wire(src={self.src},dst={self.dst})"
 
 class ArrayInfo(TypedDict, total=False):
     snap_to_grid: bool
@@ -207,13 +239,6 @@ class ArrayInfo(TypedDict, total=False):
     y_cluster_space: float
     z_cluster_space: float
 
-class FindBlockInfo(TypedDict, total=False):
-    block_id: Optional[int]
-    search_box_pos: Optional[Vector3]
-    search_box_dim: Optional[Vector3]
-    state: Optional[bool]
-    properties: Optional[List]
-
 class Module:
     """
     Base module class.
@@ -228,114 +253,66 @@ class Module:
         components: List[Block | Array | Wire]
     ):
         for c in components:
-            if isinstance(c, Block):
+            if isinstance(c, Block | Array):
                 self.blocks[c.name] = c
-            if isinstance(c, Array):
-                info = c.array_info
-                for i in range(c.width):
-                    pos_offset = Vector3(
-                        (info["x_step"] * i  + info["x_cluster_space"] * (i // info["x_cluster"])) % info["x_cycle"],
-                        (info["y_step"] * i  + info["y_cluster_space"] * (i // info["y_cluster"])) % info["y_cycle"],
-                        (info["z_step"] * i  + info["z_cluster_space"] * (i // info["z_cluster"])) % info["z_cycle"],
-                    )
-                    block_pos = c.pos + pos_offset
-                    self.blocks[f"{c.name}{i}"] = Block(
-                        f"{c.name}{i}",
-                        c.block_id,
-                        block_pos,
-                        c.state,
-                        c.properties
-                    )
-
-    def delete_block(self, block: Block) -> None:
-        """Delete a block from the save."""
-        assert isinstance(block, Block), "block must be a Block object"
-        assert block.name in self.blocks, "block does not exist in save"
-        to_remove = []
-        for key, conn_list in self.wires.items():
-            self.wires[key] = [c for c in conn_list if c.src.name != block.name and c.dst.name != block.name]
-            if not self.wires[key]:
-                to_remove.append(key)
-        # Remove keys with empty wire lists
-        for key in to_remove:
-            del self.wires[key]
-            
-        del self.blocks[block.name]
-        return
-
-    def delete_wire(self, wire: Wire) -> None:
-        """Delete a wire from the save."""
-        assert isinstance(
-            wire, Wire
-        ), "wire must be a Wire object"
-        assert wire in (n for c in self.wires.values() for n in c)
-        for c in self.wires.values():
-            for n in c:
-                if wire == n:
-                    del self.wires[n.dst.name][
-                        self.wires[n.dst.name].index(n)
-                    ]
-
-    def find_block(self, criteria: FindBlockInfo) -> List[Block]:
-        default_info: FindBlockInfo = {
-            "block_id": None,
-            "search_box_pos": None,
-            "search_box_dim": None,
-            "state": None,
-            "properties": None,
-        }
-
-        if criteria is not None:
-            default_info.update(criteria)
-        criteria = default_info
-
-        found_blocks = []
-
-        for block in self.blocks.values():
-            if criteria["block_id"] is not None and block.block_id != criteria["block_id"]:
-                continue
-            if criteria["properties"] is not None and block.properties != criteria["properties"]:
-                continue
-            if criteria["state"] is not None and block.state != criteria["state"]:
-                continue
-            if criteria["search_box_pos"] is not None:
-                dim = criteria["search_box_dim"] or Vector3.zero()
-                start = criteria["search_box_pos"]
-                end = start + dim
-                if not (min(start.x, end.x) <= block.pos.x <= max(start.x, end.x)):
-                    continue
-                if not (min(start.y, end.y) <= block.pos.y <= max(start.y, end.y)):
-                    continue
-                if not (min(start.z, end.z) <= block.pos.z <= max(start.z, end.z)):
-                    continue
-            found_blocks.append(block)
-
-        return found_blocks
+            if isinstance(c, Wire):
+                src = self.blocks[c.src]
+                dst = self.blocks[c.dst]
+                if isinstance(src, Array):
+                    if isinstance(dst, Array):
+                        max_pairs = min(src.width, dst.width)
+                        for i in range(max_pairs):
+                            self.wires[f"{c.src}{i}->{c.dst}{i}"] = Wire(f"{c.src}{i}", f"{c.dst}{i}")
+                elif isinstance(src, Block):
+                    if isinstance(dst, Array):
+                        for i in range(dst.width):
+                            self.wires[f"{c.src}->{c.dst}{i}"] = Wire(f"{c.src}", f"{c.dst}{i}")
+                    elif isinstance(dst, Block):
+                        self.wires[f"{c.src}->{c.dst}"] = c
 
     def get_block_indexes(self):
         block_indexes = {}
 
         index = 1
-        for b in self.blocks.values():
-            block_indexes[b.name] = index
-            index += 1
+        for c in self.blocks.values():
+            if isinstance(c, Block):
+                block_indexes[c.name] = index
+                index += 1
+            if isinstance(c, Array):
+                array_blocks = c.get_blocks()
+                for b in array_blocks.values():
+                    block_indexes[b.name] = index
+                    index += 1
 
         return block_indexes
+    
+    def get_blocks(self):
+        blocks = []
+        for c in self.blocks.values():
+            if isinstance(c, Block):
+                blocks.append(c)
+            if isinstance(c, Array):
+                array_blocks = c.get_blocks()
+                for b in array_blocks.values():
+                    blocks.append(b)
+
+        return blocks
+
+    def get_wires(self):
+        wires = []
+        for w in self.wires.values():
+            wires.append(w)
+        return wires
 
     def save(self, path):
         """Export module as a Circuit Maker 2 save string."""
-        block_table = []
-        wire_table = []
+        block_list = self.get_blocks()
+        block_indexes = self.get_block_indexes()
+        wire_list = self.get_wires()
+        block_table = [b.savestring_encode() for b in block_list]
+        wire_table = [w.savestring_encode(block_indexes) for w in wire_list]
         #building_table = []
         #data_table = []
-        block_indexes = self.get_block_indexes()
-
-        for b in self.blocks.values():
-            block_table.append(b.savestring_encode())
-
-        for c in self.wires.values():
-            for n in c:
-                wire_table.append(n.savestring_encode(block_indexes))
         
         # TODO: Custom build and data support
 
