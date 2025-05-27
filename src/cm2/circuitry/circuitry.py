@@ -5,7 +5,7 @@ Circuit Maker 2 library for savestring generation and manipulation
 __author__ = "Chard"
 __contact__ = "chardson.coelho17@gmail.com"
 __copyright__ = "Copyright 2025, Chard2512"
-__date__ = "2025/05/23"
+__date__ = "2025/05/27"
 __deprecated__ = False
 __license__ = "MIT"
 __maintainer__ = "Chard"
@@ -52,8 +52,12 @@ class Vector3:
     z: float
 
     @staticmethod
-    def zero():
+    def zeros():
         return Vector3(0, 0, 0)
+    
+    @staticmethod
+    def ones():
+        return Vector3(1, 1, 1)
 
     def normalize(self):
         length = math.sqrt(self.x**2 + self.y**2 + self.z**2)
@@ -66,12 +70,35 @@ class Vector3:
             self.x * other.y - self.y * other.x
         )
 
+    def elementwise_min(self, other: 'Vector3') -> 'Vector3':
+        return Vector3(
+            min(self.x, other.x),
+            min(self.y, other.y),
+            min(self.z, other.z)
+        )
+
+    def elementwise_max(self, other: 'Vector3') -> 'Vector3':
+        return Vector3(
+            max(self.x, other.x),
+            max(self.y, other.y),
+            max(self.z, other.z)
+        )
+
     def __add__(self, other):
         return Vector3(self.x + other.x, self.y + other.y, self.z + other.z)
 
     def __sub__(self, other):
         return Vector3(self.x - other.x, self.y - other.y, self.z - other.z)
-
+    
+    def __truediv__(self, other):
+        return Vector3(self.x / other, self.y / other, self.z / other)
+    
+    def __mul__(self, other):
+        return Vector3(self.x * other, self.y * other, self.z * other)
+    
+    def __round__(self, ndigits=0):
+        return Vector3(round(self.x, ndigits), round(self.y, ndigits), round(self.z, ndigits))
+    
 @dataclass
 class CFrame:
     """Data class to represent position and rotation"""
@@ -149,10 +176,10 @@ class Array:
         name: str, 
         width: int, 
         block_id: str, 
-        pos: Tuple[float, float, float] | Vector3, 
+        pos: Tuple[float, float, float] | Vector3,
+        info: Optional["ArrayInfo"]=None,
         state=False, 
-        properties=None, 
-        array_info: Optional["ArrayInfo"]=None
+        properties=None
     ):
         if isinstance(pos, Tuple):
             pos = Vector3(*pos)
@@ -177,13 +204,13 @@ class Array:
                 "y_cluster_space": 1,
                 "z_cluster_space": 1
             }
-        if array_info is not None:
-            default_info.update(array_info)
-        self.array_info = default_info
+        if info is not None:
+            default_info.update(info)
+        self.info = default_info
 
     def get_blocks(self) -> Dict:
         blocks = {}
-        info = self.array_info
+        info = self.info
         for i in range(self.width):
             pos_offset = Vector3(
                 (info["x_step"] * i  + info["x_cluster_space"] * (i // info["x_cluster"])) % info["x_cycle"],
@@ -256,8 +283,14 @@ class Module:
             if isinstance(c, Block | Array):
                 self.blocks[c.name] = c
             if isinstance(c, Wire):
-                src = self.blocks[c.src]
-                dst = self.blocks[c.dst]
+                if c.src in self.blocks:
+                    src = self.blocks[c.src]
+                else:
+                    src = Block("", "", (0, 0, 0)) # Trust that it is from an array to be developed
+                if c.dst in self.blocks:
+                    dst = self.blocks[c.dst]
+                else:
+                    dst = Block("", "", (0, 0, 0)) # Trust that it is from an array to be developed
                 if isinstance(src, Array):
                     if isinstance(dst, Array):
                         max_pairs = min(src.width, dst.width)
@@ -277,6 +310,24 @@ class Module:
             move_vector = Vector3(*move_vector)
         for c in self.blocks.values():
             c.pos += move_vector
+
+    def get_center(self, ndigits=0) -> Vector3:
+        blocks = self.get_blocks()
+        mean = Vector3(0, 0, 0)
+        for block in blocks:
+            mean += block.pos / len(blocks)
+
+        return round(mean, ndigits)
+
+    def get_dimensions(self):
+        blocks = self.get_blocks()
+        min_v = Vector3(0, 0, 0)
+        max_v = Vector3(0, 0, 0)
+        for block in blocks:
+            min_v = min_v.elementwise_min(block.pos)
+            max_v = max_v.elementwise_max(block.pos)
+        dims = (max_v - min_v) + Vector3.ones()
+        return dims
 
     def get_block_indexes(self):
         block_indexes = {}
@@ -330,46 +381,6 @@ class Module:
             file.write(string)
 
         return string
-
-    def load(self, path: str, snap_to_grid=True) -> 'Module':
-        """Import a Circuit Maker 2 save string as a module."""
-
-        with open(path, "r") as file:
-            string = file.read()
-
-        sections = string.split("?")
-        block_strings = sections[0].split(";")
-        wire_strings = sections[1].split(";")
-
-        blocks = []
-        for block_string in block_strings:
-            values = block_string.split(",")
-            block_id = int(values[0])
-            state = (values[1] == "1")
-            pos = Vector3(float(values[2]), float(values[3]), float(values[4]))
-            properties = []
-            for v in values[5].split("+"):
-                if v:
-                    properties.append(float(v))
-            if properties == []:
-                properties = None
-
-            #blocks.append(self.add_block(
-            #    str(uuid4()),
-            #    block_id,
-            #    pos,
-            #    state,
-            #    properties,
-            #    snap_to_grid
-            #))
-
-        for wire_string in wire_strings:
-            values = wire_string.split(",")
-            block1 = blocks[int(values[0]) - 1]
-            block2 = blocks[int(values[1]) - 1]
-            #self.connect_blocks(block1, block2)
-
-        return self
     
     def merge(self, other: 'Module'):
         for name, component in other.blocks.items():
