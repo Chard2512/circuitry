@@ -5,3 +5,4 @@ def closest_divisors(n: int) -> tuple[int, int]:
         if n % i == 0:
             return (i, n // i)
     return (0, 0)
+

@@ -12,10 +12,12 @@ __maintainer__ = "Chard"
 __status__ = "Production"
 __version__ = "0.1.0-snapshot3"
 
-from dataclasses import dataclass
-from typing import List, TypedDict, Optional, Tuple, Dict, Union
+import numpy as np
+from dataclasses import dataclass, field
+from typing import cast, List, TypedDict, Optional, Tuple, Dict, Union
 import math
-from enum import IntEnum
+from enum import IntEnum, Enum
+from types import MappingProxyType
 
 BIG_INT = 2147483647
 
@@ -41,6 +43,20 @@ class BlockID(IntEnum):
     ANTENNA = 17
     CONDUCTOR_V2 = 18
     LED_MIXER = 19
+
+class BuildingData(Enum):
+    HUGE_MEMORY = MappingProxyType({
+        "name": "HugeMemory", 
+        "nwires": 49, 
+        "address_index": 0,
+        "output_index": 16,
+        "value_index": 32,
+        "write_index": 48
+    })
+
+class Port(IntEnum):
+    OUT = 0
+    IN = 1
 
 @dataclass
 class Vector3:
@@ -99,10 +115,12 @@ class Vector3:
     
 @dataclass
 class CFrame:
-    """Data class to represent position and rotation"""
-    def __init__(self, position: Vector3, rotation=None):
-        self.position = position
-        self.rotation = rotation or self.identity_matrix()
+    pos: Vector3 | Tuple[float, float, float]
+    rot: List[List[float]] = field(default_factory=lambda: [[0, 0, -1], [0, 1, 0], [1, 0, 0]])
+
+    def __post_init__(self):
+        if isinstance(self.pos, Tuple):
+            self.pos = Vector3(*self.pos)
 
     @staticmethod
     def identity_matrix():
@@ -112,23 +130,56 @@ class CFrame:
             [0, 0, 1]   # Backward
         ]
 
-    @classmethod
-    def look_at(cls, from_pos: Vector3, to_pos: Vector3):
+    @staticmethod
+    def look_at(from_pos: Vector3, to_pos: Vector3, up: Vector3 = Vector3(0, 1, 0)):
         forward = (to_pos - from_pos).normalize()
-        up = Vector3(0, 1, 0)
+        
+        if abs(forward.x - up.x) < 1e-6 and abs(forward.y - up.y) < 1e-6 and abs(forward.z - up.z) < 1e-6:
+            up = Vector3(0, 0, 1)
+
         right = up.cross(forward).normalize()
         up = forward.cross(right).normalize()
 
         rotation = [
-            [right.x, right.y, right.z],
-            [up.x, up.y, up.z],
-            [forward.x, forward.y, forward.z]
+            [right.x, right.y, right.z],    # Right
+            [up.x, up.y, up.z],             # Up
+            [forward.x, forward.y, forward.z]  # Forward (yeah, idk why)
         ]
 
-        return cls(from_pos, rotation)
+        return CFrame(from_pos, rotation)
+
+    @staticmethod
+    def angles(euler_angles: Tuple[float, float, float]) -> List[List[float]]:
+        roll, pitch, yaw = euler_angles
+        roll = np.radians(roll)
+        pitch = np.radians(pitch)
+        yaw = np.radians(yaw)
+
+        Rx = np.array([
+            [1, 0, 0],
+            [0, np.cos(roll), -np.sin(roll)],
+            [0, np.sin(roll), np.cos(roll)]
+        ])
+
+        Ry = np.array([
+            [np.cos(pitch), 0, np.sin(pitch)],
+            [0, 1, 0],
+            [-np.sin(pitch), 0, np.cos(pitch)]
+        ])
+
+        Rz = np.array([
+            [np.cos(yaw), -np.sin(yaw), 0],
+            [np.sin(yaw), np.cos(yaw), 0],
+            [0, 0, 1]
+        ])
+
+        R = Rz @ Ry @ Rx
+        # Why the hell should I say this? This supposed to be a list, not a bool!
+        R_list = cast(List[List[float]], R.tolist())
+        return R_list
 
     def __repr__(self):
-        return f"CFrame(pos={self.position}, rot={self.rotation})"
+        return f"CFrame(pos={self.pos}, rot={self.rot})"
 
 class Block:
     def __init__(
@@ -263,6 +314,83 @@ class ArrayInfo(TypedDict, total=False):
     y_cluster_space: float
     z_cluster_space: float
 
+class Building():
+    def __init__(
+        self, 
+        name: str, 
+        building_type: str, 
+        cframe: CFrame | Tuple[float, float, float],
+        nwires: int = 0
+    ):
+        if isinstance(cframe, Tuple):
+            cframe = CFrame(cframe)
+        self.name = name
+        self.building_type = building_type
+        self.cframe: CFrame = cframe
+        if str.upper(self.building_type) in BuildingData.__members__:
+            nwires = int(BuildingData[str.upper(self.building_type)].value["nwires"])
+        self.wires = [[] for _ in range(nwires)]
+
+    def add_wire(self, building_wire: 'BuildingWire'):
+        if isinstance(building_wire.index, str):
+            index = int(BuildingData[self.building_type].value[f"{building_wire.index}_index"])
+        else:
+            index = building_wire.index
+
+        self.wires[index].append(building_wire)
+
+    def savestring_encode(self, block_indexes):
+        assert isinstance(self.cframe.pos, Vector3)
+
+        if str.upper(self.building_type) not in BuildingData.__members__:
+            building_type = self.building_type
+        else:
+            building_type = str(BuildingData[str.upper(self.building_type)].value["name"])
+
+        savestring_table = [
+            building_type,
+            str(round(self.cframe.pos.x, 3)),
+            str(round(self.cframe.pos.y, 3)),
+            str(round(self.cframe.pos.z, 3)),
+            str(round(self.cframe.rot[0][0], 3)),
+            str(round(self.cframe.rot[0][1], 3)),
+            str(round(self.cframe.rot[0][2], 3)),
+            str(round(self.cframe.rot[1][0], 3)),
+            str(round(self.cframe.rot[1][1], 3)),
+            str(round(self.cframe.rot[1][2], 3)),
+            str(round(self.cframe.rot[2][0], 3)),
+            str(round(self.cframe.rot[2][1], 3)),
+            str(round(self.cframe.rot[2][2], 3)), 
+        ]
+
+        for w in self.wires:
+            if w == []: # Empty
+                savestring_table.append("")
+            elif isinstance(w, List):
+                bwires_savestring = "+".join(_w.savestring_encode(block_indexes) for _w in w)
+                savestring_table.append(bwires_savestring)
+
+        return ",".join(savestring_table)
+    
+    def __repr__(self):
+        return (
+            f"Building("
+            f"{self.building_type}",
+            f"{self.cframe.pos}",
+            f"{self.cframe.rot}"
+            f")"
+        )
+
+class BuildingWire():
+    def __init__(self, buidling: str, index: str | int, port: str, src: str):
+        self.building = buidling
+        self.index = index
+        self.port = port
+        self.src = src
+
+    def savestring_encode(self, block_indexes):
+        return f"{Port[str.upper(self.port)]}{block_indexes[self.src]}"
+
 class Module:
     """
     Base module class.
@@ -275,7 +403,7 @@ class Module:
 
     def add(
         self,
-        components: List[Union[Block, Array, Wire, "Module"]]
+        components: List[Union[Block, Array, Wire, "Module", Building, BuildingWire]]
     ):
         for c in components:
             if isinstance(c, Block | Array):
@@ -283,12 +411,12 @@ class Module:
             if isinstance(c, Wire):
                 if c.src in self.blocks:
                     src = self.blocks[c.src]
-                else:
+                else: # Probably a block from an array or a typo
                     src = Block("", "", (0, 0, 0)) # Trust that it is from an array to be developed
                 if c.dst in self.blocks:
                     dst = self.blocks[c.dst]
-                else:
-                    dst = Block("", "", (0, 0, 0)) # Trust that it is from an array to be developed
+                else: # idem
+                    dst = Block("", "", (0, 0, 0)) # idem
                 if isinstance(src, Array):
                     if isinstance(dst, Array):
                         max_pairs = min(src.width, dst.width)
@@ -302,6 +430,11 @@ class Module:
                         self.wires[f"{c.src}->{c.dst}"] = c
             if isinstance(c, Module):
                 self.merge(c)
+            if isinstance(c, Building):
+                self.buildings[c.name] = c
+            if isinstance(c, BuildingWire):
+                building: Building = self.buildings[c.building]
+                building.add_wire(c)
 
     def move(self, move_vector: Tuple[float, float, float] | Vector3):
         if isinstance(move_vector, Tuple):
@@ -361,19 +494,26 @@ class Module:
             wires.append(w)
         return wires
 
+    def get_buildings(self):
+        buildings = []
+        for w in self.buildings.values():
+            buildings.append(w)
+        return buildings
+
     def save(self, path):
         """Export module as a Circuit Maker 2 save string."""
         block_list = self.get_blocks()
         block_indexes = self.get_block_indexes()
         wire_list = self.get_wires()
+        buildings_list = self.get_buildings()
         block_table = [b.savestring_encode() for b in block_list]
         wire_table = [w.savestring_encode(block_indexes) for w in wire_list]
-        #building_table = []
+        building_table = [bd.savestring_encode(block_indexes) for bd in buildings_list]
         #data_table = []
         
         # TODO: Custom build and data support
 
-        string = ";".join(block_table) + "?" + ";".join(wire_table) + "??"
+        string = ";".join(block_table) + "?" + ";".join(wire_table) + "?" + ";".join(building_table) +"?"
         
         with open(path, "w") as file:
             file.write(string)
