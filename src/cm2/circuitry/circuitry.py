@@ -10,7 +10,7 @@ __deprecated__ = False
 __license__ = "MIT"
 __maintainer__ = "Chard"
 __status__ = "Production"
-__version__ = "0.1.0-snapshot3"
+__version__ = "0.1.0-snapshot4"
 
 import numpy as np
 from dataclasses import dataclass, field
@@ -174,7 +174,7 @@ class CFrame:
         ])
 
         R = Rz @ Ry @ Rx
-        # Why the hell should I say this? This supposed to be a list, not a bool!
+        # Necessary unnecessary statement, because linter fears this gonna be a bool instead of a list
         R_list = cast(List[List[float]], R.tolist())
         return R_list
 
@@ -185,8 +185,8 @@ class Block:
     def __init__(
             self, 
             name: str, 
-            block_id: str, 
-            pos: Tuple[float, float, float] | Vector3, 
+            block_id: str="node", 
+            pos: Tuple[float, float, float] | Vector3=(0, 0, 0), 
             state=False, 
             properties=None
     ):
@@ -224,8 +224,8 @@ class Array:
         self, 
         name: str, 
         width: int, 
-        block_id: str, 
-        pos: Tuple[float, float, float] | Vector3,
+        block_id: str="node", 
+        pos: Tuple[float, float, float] | Vector3=(0, 0, 0),
         info: Optional["ArrayInfo"]=None,
         state=False, 
         properties=None
@@ -411,12 +411,22 @@ class Module:
             if isinstance(c, Wire):
                 if c.src in self.blocks:
                     src = self.blocks[c.src]
-                else: # Probably a block from an array or a typo
-                    src = Block("", "", (0, 0, 0)) # Trust that it is from an array to be developed
+                else: # Probably a block from an array or array name from developed array
+                    # Check if it is a developed array
+                    if f"{c.src}0" in self.blocks:
+                        size = self.find_developed_array_size(c.src)
+                        src = Array("", size, "")
+                    else:
+                        src = Block("", "") # Trust that it is a block from an array to be developed
                 if c.dst in self.blocks:
                     dst = self.blocks[c.dst]
-                else: # idem
-                    dst = Block("", "", (0, 0, 0)) # idem
+                else: # Probably a block from an array or array name from developed array
+                    # Check if it is a developed array
+                    if f"{c.dst}0" in self.blocks:
+                        size = self.find_developed_array_size(c.dst)
+                        dst = Array("", size, "")
+                    else:
+                        dst = Block("", "") # Trust that it is a block from an array to be developed
                 if isinstance(src, Array):
                     if isinstance(dst, Array):
                         max_pairs = min(src.width, dst.width)
@@ -499,6 +509,29 @@ class Module:
         for w in self.buildings.values():
             buildings.append(w)
         return buildings
+    
+    def find_developed_array_size(self, src):
+        """
+        Find the width of a developed array, an array that was
+        created through blocks with enumerated names instead
+        of using Array object.
+        """
+        bottom, top = 0, 32
+        while f"{src}{top - 1}" in self.blocks:
+            bottom = top
+            top *= 2
+        prev_mid = None
+        while bottom < top:
+            mid = (top + bottom) // 2
+            if mid == prev_mid:
+                break
+            if f"{src}{mid - 1}" in self.blocks:
+                bottom = mid
+            else:
+                top = mid
+            prev_mid = mid
+
+        return mid
 
     def save(self, path):
         """Export module as a Circuit Maker 2 save string."""
