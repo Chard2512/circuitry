@@ -49,9 +49,13 @@ class BuildingData(Enum):
         "name": "HugeMemory", 
         "nwires": 49, 
         "address_index": 0,
+        "address_width": 16,
         "output_index": 16,
+        "output_width": 16,
         "value_index": 32,
-        "write_index": 48
+        "value_width": 16,
+        "write_index": 48,
+        "write_width": 1,
     })
 
 class Port(IntEnum):
@@ -333,11 +337,26 @@ class Building():
 
     def add_wire(self, building_wire: 'BuildingWire'):
         if isinstance(building_wire.index, str):
-            index = int(BuildingData[self.building_type].value[f"{building_wire.index}_index"])
+            index = int(BuildingData[str.upper(self.building_type)].value[f"{building_wire.index}_index"])
+            width = int(BuildingData[str.upper(self.building_type)].value[f"{building_wire.index}_width"])
+
+            arrange = [str(i) for i in range(1, width + 1, 1)]
+            arrange = sorted(arrange)
+            j = 0
+            for i in arrange:
+                self.wires[index + j].append(
+                    BuildingWire(
+                        building_wire.building, 
+                        index + j,
+                        building_wire.port,
+                        f"{building_wire.src}{int(i) - 1}"
+                    )
+                )
+                j += 1
         else:
             index = building_wire.index
 
-        self.wires[index].append(building_wire)
+            self.wires[index].append(building_wire)
 
     def savestring_encode(self, block_indexes):
         assert isinstance(self.cframe.pos, Vector3)
@@ -390,6 +409,16 @@ class BuildingWire():
 
     def savestring_encode(self, block_indexes):
         return f"{Port[str.upper(self.port)]}{block_indexes[self.src]}"
+    
+    def __repr__(self):
+        return (
+            f"BuildingWire("
+            f"building={self.building},"
+            f"index={self.index},"
+            f"port={str.upper(self.port)},"
+            f"src={self.src}"
+            f")"
+        )
 
 class Module:
     """
