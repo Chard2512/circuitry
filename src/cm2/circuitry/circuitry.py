@@ -1,5 +1,5 @@
 """
-Circuit Maker 2 library for savestring generation and manipulation
+Library for savestring generation and manipulation for Circuit Maker 2 game
 """
 
 __author__ = "Chard"
@@ -10,7 +10,7 @@ __deprecated__ = False
 __license__ = "MIT"
 __maintainer__ = "Chard"
 __status__ = "Production"
-__version__ = "0.1.0-snapshot4"
+__version__ = "0.1.0-snapshot5"
 
 import numpy as np
 from dataclasses import dataclass, field
@@ -227,9 +227,9 @@ class Array:
     def __init__(
         self, 
         name: str, 
-        width: int, 
-        block_id: str="node", 
+        block_id: str="node",
         pos: Tuple[float, float, float] | Vector3=(0, 0, 0),
+        width: int=None, 
         info: Optional["ArrayInfo"]=None,
         state=False, 
         properties=None
@@ -271,8 +271,8 @@ class Array:
                 (info["z_step"] * i  + info["z_cluster_space"] * (i // info["z_cluster"])) % info["z_cycle"],
             )
             block_pos = self.pos + pos_offset
-            blocks[f"{self.name}{i}"] = Block(
-                f"{self.name}{i}",
+            blocks[f"{self.name}.{i}"] = Block(
+                f"{self.name}.{i}",
                 self.block_id,
                 block_pos,
                 self.state,
@@ -429,13 +429,22 @@ class Module:
         self.blocks = {}
         self.wires = {}
         self.buildings = {}
+        self.size = None
 
     def add(
         self,
-        components: List[Union[Block, Array, Wire, "Module", Building, BuildingWire]]
+        components: Union[List, Block, Array, Wire, "Module", Building, BuildingWire]
     ):
+        if not isinstance(components, List):
+            components = [components]
         for c in components:
-            if isinstance(c, Block | Array):
+            if isinstance(c, List):
+                self.add(c)
+            if isinstance(c, Block):
+                self.blocks[c.name] = c
+            if isinstance(c, Array):
+                if c.width is None:
+                    c.width = self.size
                 self.blocks[c.name] = c
             if isinstance(c, Wire):
                 if c.src in self.blocks:
@@ -460,11 +469,11 @@ class Module:
                     if isinstance(dst, Array):
                         max_pairs = min(src.width, dst.width)
                         for i in range(max_pairs):
-                            self.wires[f"{c.src}{i}->{c.dst}{i}"] = Wire(f"{c.src}{i}", f"{c.dst}{i}")
+                            self.wires[f"{c.src}.{i}->{c.dst}.{i}"] = Wire(f"{c.src}.{i}", f"{c.dst}.{i}")
                 elif isinstance(src, Block):
                     if isinstance(dst, Array):
                         for i in range(dst.width):
-                            self.wires[f"{c.src}->{c.dst}{i}"] = Wire(f"{c.src}", f"{c.dst}{i}")
+                            self.wires[f"{c.src}->{c.dst}.{i}"] = Wire(f"{c.src}", f"{c.dst}.{i}")
                     elif isinstance(dst, Block):
                         self.wires[f"{c.src}->{c.dst}"] = c
             if isinstance(c, Module):
@@ -475,7 +484,16 @@ class Module:
                 building: Building = self.buildings[c.building]
                 building.add_wire(c)
 
+    def set_size(self, size: int):
+        """
+        Set default arrays' size
+        """
+        self.size = size
+
     def move(self, move_vector: Tuple[float, float, float] | Vector3):
+        """
+        Move the entire module by a relative position
+        """
         if isinstance(move_vector, Tuple):
             move_vector = Vector3(*move_vector)
         for c in self.blocks.values():
