@@ -10,16 +10,18 @@ __deprecated__ = False
 __license__ = "MIT"
 __maintainer__ = "Chard"
 __status__ = "Production"
-__version__ = "0.1.0-snapshot5"
+__version__ = "0.2.0-snapshot1"
 
 import numpy as np
 from dataclasses import dataclass, field
-from typing import cast, List, TypedDict, Optional, Tuple, Dict, Union
+from typing import cast, List, TypedDict, Optional, Tuple, Dict, Union, Literal
 import math
 from enum import IntEnum, Enum
 from types import MappingProxyType
 
 BIG_INT = 2147483647
+
+RotationOrder = Literal['xyz', 'xzy', 'yxz', 'yzx', 'zxy', 'zyx']
 
 # Pre-defined block_id definitions
 class BlockID(IntEnum):
@@ -153,7 +155,11 @@ class CFrame:
         return CFrame(from_pos, rotation)
 
     @staticmethod
-    def angles(euler_angles: Tuple[float, float, float]) -> List[List[float]]:
+    def angles(euler_angles: Tuple[float, float, float], rotation_order: RotationOrder = 'zyx') -> List[List[float]]:
+        """
+        Create a rotation matrix from euler angles.
+        rotation_order defines the rotation apply order.
+        """
         roll, pitch, yaw = euler_angles
         roll = np.radians(roll)
         pitch = np.radians(pitch)
@@ -177,7 +183,16 @@ class CFrame:
             [0, 0, 1]
         ])
 
-        R = Rz @ Ry @ Rx
+        rotation_map = {
+            'x': Rx,
+            'y': Ry,
+            'z': Rz
+        }
+
+        R = np.eye(3)
+        for axis in reversed(rotation_order):  # Note: rotations are applied right-to-left
+            R = R @ rotation_map[axis]
+
         # Necessary unnecessary statement, because linter fears this gonna be a bool instead of a list
         R_list = cast(List[List[float]], R.tolist())
         return R_list
@@ -201,6 +216,11 @@ class Block:
         self.state = state
         self.pos = pos
         self.properties = properties
+
+    def set_pos(self, pos: Tuple[float, float, float] | Vector3):
+        if isinstance(pos, Tuple):
+            pos = Vector3(*pos)
+        self.pos = pos
 
     def savestring_encode(self):
         savestring_table = [
@@ -265,10 +285,16 @@ class Array:
         blocks = {}
         info = self.info
         for i in range(self.width):
+            x_pos = (info["x_step"] * i + info["x_cluster_space"] * (i // info["x_cluster"]))
+            y_pos = (info["y_step"] * i + info["y_cluster_space"] * (i // info["y_cluster"]))
+            z_pos = (info["z_step"] * i + info["z_cluster_space"] * (i // info["z_cluster"]))
+            x_cycled = (abs(x_pos) % info["x_cycle"]) * np.sign(x_pos)
+            y_cycled = (abs(y_pos) % info["y_cycle"]) * np.sign(y_pos)
+            z_cycled = (abs(z_pos) % info["z_cycle"]) * np.sign(z_pos)
             pos_offset = Vector3(
-                (info["x_step"] * i  + info["x_cluster_space"] * (i // info["x_cluster"])) % info["x_cycle"],
-                (info["y_step"] * i  + info["y_cluster_space"] * (i // info["y_cluster"])) % info["y_cycle"],
-                (info["z_step"] * i  + info["z_cluster_space"] * (i // info["z_cluster"])) % info["z_cycle"],
+                x_cycled,
+                y_cycled,
+                z_cycled,
             )
             block_pos = self.pos + pos_offset
             blocks[f"{self.name}.{i}"] = Block(
@@ -280,6 +306,30 @@ class Array:
             )
         
         return blocks
+
+    def set_pos(self, pos: Tuple[float, float, float] | Vector3):
+        if isinstance(pos, Tuple):
+            pos = Vector3(*pos)
+        self.pos = pos
+
+    def set_info(self, info: 'ArrayInfo'):
+        default_info: ArrayInfo = {
+                "snap_to_grid": True,
+                "x_step": 1,
+                "y_step": 0,
+                "z_step": 0,
+                "x_cycle": BIG_INT,
+                "y_cycle": BIG_INT,
+                "z_cycle": BIG_INT,
+                "x_cluster": BIG_INT,
+                "y_cluster": BIG_INT,
+                "z_cluster": BIG_INT,
+                "x_cluster_space": 1,
+                "y_cluster_space": 1,
+                "z_cluster_space": 1
+            }
+        default_info.update(info)
+        self.info = default_info
 
     def __repr__(self):
         return (
@@ -293,9 +343,10 @@ class Array:
         )
 
 class Wire:
-    def __init__(self, src: str, dst: str):
+    def __init__(self, src: str, dst: str, inverted: bool = False):
         self.src = src
         self.dst = dst
+        self.inverted = inverted
 
     def savestring_encode(self, block_indexes):
         return f"{block_indexes[self.src]},{block_indexes[self.dst]}"
@@ -447,29 +498,33 @@ class Module:
                     c.width = self.size
                 self.blocks[c.name] = c
             if isinstance(c, Wire):
-                if c.src in self.blocks:
+                if c.src in self.blocks:         
                     src = self.blocks[c.src]
                 else: # Probably a block from an array or array name from developed array
                     # Check if it is a developed array
-                    if f"{c.src}0" in self.blocks:
+                    if f"{c.src}.0" in self.blocks:
                         size = self.find_developed_array_size(c.src)
-                        src = Array("", size, "")
+                        src = Array("", width=size)
                     else:
-                        src = Block("", "") # Trust that it is a block from an array to be developed
+                        src = Block("") # Trust that it is a block from an array to be developed
                 if c.dst in self.blocks:
                     dst = self.blocks[c.dst]
                 else: # Probably a block from an array or array name from developed array
                     # Check if it is a developed array
-                    if f"{c.dst}0" in self.blocks:
+                    if f"{c.dst}.0" in self.blocks:
                         size = self.find_developed_array_size(c.dst)
-                        dst = Array("", size, "")
+                        dst = Array("", width=size)
                     else:
-                        dst = Block("", "") # Trust that it is a block from an array to be developed
+                        dst = Block("") # Trust that it is a block from an array to be developed
                 if isinstance(src, Array):
                     if isinstance(dst, Array):
                         max_pairs = min(src.width, dst.width)
-                        for i in range(max_pairs):
-                            self.wires[f"{c.src}.{i}->{c.dst}.{i}"] = Wire(f"{c.src}.{i}", f"{c.dst}.{i}")
+                        if not c.inverted:
+                            for i in range(max_pairs):
+                                self.wires[f"{c.src}.{i}->{c.dst}.{i}"] = Wire(f"{c.src}.{i}", f"{c.dst}.{i}")
+                        else:
+                            for i in range(max_pairs):
+                                self.wires[f"{c.src}.{i}->{c.dst}.{max_pairs - i - 1}"] = Wire(f"{c.src}.{i}", f"{c.dst}.{max_pairs - i - 1}")
                 elif isinstance(src, Block):
                     if isinstance(dst, Array):
                         for i in range(dst.width):
@@ -498,6 +553,32 @@ class Module:
             move_vector = Vector3(*move_vector)
         for c in self.blocks.values():
             c.pos += move_vector
+
+    def rotate(self, rotation_matrix: List[List[float]], pivot: Tuple[float, float, float] | Vector3=(0, 0, 0)):
+        """
+        Rotate the module by a rotation matrix over a pivot
+        """
+        if isinstance(pivot, Vector3):
+            pivot = (pivot.x, pivot.y, pivot.z)
+
+        pivot = np.array(pivot)  
+
+        for c in self.blocks.values():
+            pos = np.array((c.pos.x, c.pos.y, c.pos.z))
+            translated = pos - pivot
+            rotated = np.dot(rotation_matrix, translated)
+            c.pos = Vector3(*rotated) + Vector3(*pivot)
+
+            if isinstance(c, Array):
+                orientation = (
+                    c.info.get("x_step"),
+                    c.info.get("y_step"),
+                    c.info.get("z_step")
+                )
+                rot_orientation = np.dot(rotation_matrix, orientation)
+                c.info["x_step"]= rot_orientation[0]
+                c.info["y_step"] = rot_orientation[1]
+                c.info["z_step"] = rot_orientation[2]
 
     def get_center(self, ndigits=0) -> Vector3:
         blocks = self.get_blocks()
@@ -557,6 +638,12 @@ class Module:
             buildings.append(w)
         return buildings
     
+    def get_block(self, name: str) -> Block | Array:
+        """
+        Return a block/array component from self.blocks
+        """
+        return self.blocks.get(name)
+
     def find_developed_array_size(self, src):
         """
         Find the width of a developed array, an array that was
@@ -564,7 +651,7 @@ class Module:
         of using Array object.
         """
         bottom, top = 0, 32
-        while f"{src}{top - 1}" in self.blocks:
+        while f"{src}.{top - 1}" in self.blocks:
             bottom = top
             top *= 2
         prev_mid = None
@@ -572,7 +659,7 @@ class Module:
             mid = (top + bottom) // 2
             if mid == prev_mid:
                 break
-            if f"{src}{mid - 1}" in self.blocks:
+            if f"{src}.{mid - 1}" in self.blocks:
                 bottom = mid
             else:
                 top = mid
