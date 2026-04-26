@@ -5,9 +5,9 @@ from typing import Callable
 GateCallable: TypeAlias = Callable[
     [
         str,
-        Optional[List[str] | str],
-        Optional[Tuple[float, float, float]],
-        Optional[bool],
+        List[str] | str,
+        Tuple[float, float, float],
+        bool,
         Optional[List[str]],
         Optional[Dict[str, int]],
         Optional[Dict[str, bool]]
@@ -42,9 +42,9 @@ def ArrayOf(
 def _make_gate(block_id: str) -> GateCallable:
     def gate(
         name: str, 
-        outputs: Optional[List[str] | str] = [],
-        pos: Optional[Tuple[float, float, float]] = (0, 0, 0), 
-        state: Optional[bool] = False, 
+        outputs: List[str] | str = [],
+        pos: Tuple[float, float, float] = (0, 0, 0), 
+        state: bool = False, 
         properties: Optional[List[str]] = None,
         delayed: Optional[Dict[str, int]] = None,
         inverted: Optional[Dict[str, bool]] = None, # For array connection
