@@ -1,81 +1,72 @@
 from .core import *
 from cm2.modules.stdm import *
+from typing import Callable
+
+GateCallable: TypeAlias = Callable[
+    [
+        str,
+        Optional[List[str] | str],
+        Optional[Tuple[float, float, float]],
+        Optional[bool],
+        Optional[List[str]],
+        Optional[Dict[str, int]],
+        Optional[Dict[str, bool]]
+    ],
+    List[PrimitiveComponent]
+]
 
 def ArrayOf(
-        component: list,
-        width: int=None, 
-        info: Optional["ArrayInfo"]=None,
-    ):
-    def convert_block_to_array(_list):
-        new_list = []
+        component: List[PrimitiveComponent],
+        width: Optional[int] = None, 
+        info: Optional["ArrayInfo"] = None,
+    ) -> List[PrimitiveComponent]:
+    def convert_block_to_array(_list: List[Any]) -> List[Any]:
+        new_list: List[PrimitiveComponent] = []
         for component in _list:
             if isinstance(component, Block):
                 new_component = Array(
                     component.name, 
                     component.block_id,
-                    component.pos,
+                    (component.pos.x, component.pos.y, component.pos.z),
                     width,
                     info,
                     component.state,
                     component.properties)
                 new_list.append(new_component)
-            elif type(component) == list:
+            elif type(component) == List[PrimitiveComponent]:
                 convert_block_to_array(component)
-            else:
-                new_list.append(component)
+            new_list.append(component)
         return new_list
     return convert_block_to_array(component)
 
-def _make_gate(block_id: str):
+def _make_gate(block_id: str) -> GateCallable:
     def gate(
         name: str, 
-        outputs: list[str] | str = [],
-        pos: Tuple[float, float, float] = (0, 0, 0), 
-        state=False, 
-        properties=None,
-        delayed: Dict[str, int] = None,
-        inverted: Dict[str, bool] = None, # For array connection
-    ):
+        outputs: Optional[List[str] | str] = [],
+        pos: Optional[Tuple[float, float, float]] = (0, 0, 0), 
+        state: Optional[bool] = False, 
+        properties: Optional[List[str]] = None,
+        delayed: Optional[Dict[str, int]] = None,
+        inverted: Optional[Dict[str, bool]] = None, # For array connection
+    ) -> List[PrimitiveComponent]:
         if type(outputs) == str:
             outputs = [outputs]
-        components = [Block(name, block_id, pos, state, properties)]
-        for output in outputs:
-            if delayed and output in delayed:
-                delay_name = delay_name = f"{output[0]}._delay.{name}"
-                components.append([
-                    Block(delay_name, "delay", pos, properties=[str(delayed[output])]),
-                    Wire(name, delay_name),
-                    Wire(delay_name, output) if output not in inverted else
-                    Wire(delay_name, output, inverted[output])
-                ])
-            else:
-                components.append(Wire(name, output))
+        components: List[Any] = [Block(name, block_id, pos, state, properties)]
+        if outputs:
+            for output in outputs:
+                if delayed and output in delayed:
+                    delay_name = delay_name = f"{output[0]}._delay.{name}"
+                    components.append([
+                        Block(delay_name, "delay", pos, properties=[str(delayed[output])]),
+                        Wire(name, delay_name),
+                        Wire(delay_name, output) if not inverted or (not output in inverted) else
+                        Wire(delay_name, output, inverted[output])
+                    ])
+                else:
+                    components.append(Wire(name, output))
         return components
     
     return gate
-
-
-# This is for linting purposes
-def Nor(name, outputs=[], pos=(0,0,0), state=True, properties=None, delayed=None, inverted=None): pass
-def And(name, outputs=[], pos=(0,0,0), state=True, properties=None, delayed=False, inverted=None): pass
-def Or(name, outputs=[], pos=(0,0,0), state=True, properties=None, delayed=False, inverted=None): pass
-def Xor(name, outputs=[], pos=(0,0,0), state=True, properties=None, delayed=False, inverted=None): pass
-def Button(name, outputs=[], pos=(0,0,0), state=True, properties=None, delayed=False, inverted=None): pass
-def Flipflop(name, outputs=[], pos=(0,0,0), state=True, properties=None, delayed=False, inverted=None): pass
-def Led(name, outputs=[], pos=(0,0,0), state=True, properties=None, delayed=False, inverted=None): pass
-def Sound(name, outputs=[], pos=(0,0,0), state=True, properties=None, delayed=False, inverted=None): pass
-def Conductor(name, outputs=[], pos=(0,0,0), state=True, properties=None, delayed=False, inverted=None): pass
-def Custom(name, outputs=[], pos=(0,0,0), state=True, properties=None, delayed=False, inverted=None): pass
-def Nand(name, outputs=[], pos=(0,0,0), state=True, properties=None, delayed=False, inverted=None): pass
-def Xnor(name, outputs=[], pos=(0,0,0), state=True, properties=None, delayed=False, inverted=None): pass
-def Random(name, outputs=[], pos=(0,0,0), state=True, properties=None, delayed=False, inverted=None): pass
-def Text(name, outputs=[], pos=(0,0,0), state=True, properties=None, delayed=False, inverted=None): pass
-def Tile(name, outputs=[], pos=(0,0,0), state=True, properties=None, delayed=False, inverted=None): pass
-def Node(name, outputs=[], pos=(0,0,0), state=True, properties=None, delayed=False, inverted=None): pass
-def Delay(name, outputs=[], pos=(0,0,0), state=True, properties=None, delayed=False, inverted=None): pass
-def Antenna(name, outputs=[], pos=(0,0,0), state=True, properties=None, delayed=False, inverted=None): pass
-def ConductorV2(name, outputs=[], pos=(0,0,0), state=True, properties=None, delayed=False, inverted=None): pass
-def LedMixer(name, outputs=[], pos=(0,0,0), state=True, properties=None, delayed=False, inverted=None): pass
 
 Nor = _make_gate("nor")
 And = _make_gate("and")

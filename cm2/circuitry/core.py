@@ -4,16 +4,51 @@ Library for savestring generation and manipulation for Circuit Maker 2 game
 
 import numpy as np
 from dataclasses import dataclass, field
-from typing import cast, List, TypedDict, Optional, Tuple, Dict, Union, Literal
+from typing import cast, Any, List, TypedDict, Optional, Tuple, Dict, Union, Literal, TypeAlias, get_args
 import math
 from enum import IntEnum, Enum
 from types import MappingProxyType
 from cm2.utils import flatten_recursive
-import re
+
+Component: TypeAlias = Union[
+    "Block", "Array", "Wire", "Module", "Building", "BuildingWire",
+    List["Component"]
+]
+
+ConstructComponent: TypeAlias = Union[
+    "Block", "Array", "Building",
+    List["ConstructComponent"]
+]
+
+ConnectionComponent: TypeAlias = Union[
+    "Wire", "BuildingWire",
+    List["ConnectionComponent"]
+]
+
+PrimitiveComponent: TypeAlias = Union[
+    "Block", "Array", "Wire",
+    List["PrimitiveComponent"]
+]
+
+Construct: TypeAlias = Union[
+    "Block", "Array", "Building"
+]
+
+Connection: TypeAlias = Union[
+    "Wire", "BuildingWire"
+]
+
+Primitive: TypeAlias = Union[
+    "Block", "Array", "Wire"
+]
+
+RotationOrder: TypeAlias = Literal['xyz', 'xzy', 'yxz', 'yzx', 'zxy', 'zyx']
 
 BIG_INT = 2147483647
 
-RotationOrder = Literal['xyz', 'xzy', 'yxz', 'yzx', 'zxy', 'zyx']
+def istypeof(value: Any, union_type: Any) -> bool:
+    types = get_args(union_type)
+    return type(value) in types
 
 # Pre-defined block_id definitions
 class BlockID(IntEnum):
@@ -64,18 +99,18 @@ class Vector3:
     z: float
 
     @staticmethod
-    def zeros():
+    def zeros() -> Vector3:
         return Vector3(0, 0, 0)
     
     @staticmethod
-    def ones():
+    def ones() -> Vector3:
         return Vector3(1, 1, 1)
 
-    def normalize(self):
+    def normalize(self) -> Vector3:
         length = math.sqrt(self.x**2 + self.y**2 + self.z**2)
         return Vector3(self.x / length, self.y / length, self.z / length)
     
-    def cross(self, other: 'Vector3'):
+    def cross(self, other: 'Vector3') -> Vector3:
         return Vector3(
             self.y * other.z - self.z * other.y,
             self.z * other.x - self.x * other.z,
@@ -96,19 +131,19 @@ class Vector3:
             max(self.z, other.z)
         )
 
-    def __add__(self, other):
+    def __add__(self, other: Vector3):
         return Vector3(self.x + other.x, self.y + other.y, self.z + other.z)
 
-    def __sub__(self, other):
+    def __sub__(self, other: Vector3):
         return Vector3(self.x - other.x, self.y - other.y, self.z - other.z)
     
-    def __truediv__(self, other):
+    def __truediv__(self, other: float | int):
         return Vector3(self.x / other, self.y / other, self.z / other)
     
-    def __mul__(self, other):
+    def __mul__(self, other: float | int):
         return Vector3(self.x * other, self.y * other, self.z * other)
     
-    def __round__(self, ndigits=0):
+    def __round__(self, ndigits: int = 0):
         return Vector3(round(self.x, ndigits), round(self.y, ndigits), round(self.z, ndigits))
     
 @dataclass
@@ -181,12 +216,12 @@ class CFrame:
             'z': Rz
         }
 
-        R = np.eye(3)
+        r = np.eye(3)
         for axis in reversed(rotation_order):  # Note: rotations are applied right-to-left
-            R = R @ rotation_map[axis]
+            r = r @ rotation_map[axis]
 
         # Necessary unnecessary statement, because linter fears this gonna be a bool instead of a list
-        R_list = cast(List[List[float]], R.tolist())
+        R_list = cast(List[List[float]], r.tolist())
         return R_list
 
     def __repr__(self):
@@ -196,23 +231,19 @@ class Block:
     def __init__(
             self, 
             name: str, 
-            block_id: str="node", 
-            pos: Tuple[float, float, float] | Vector3=(0, 0, 0), 
-            state=False, 
-            properties=None
+            block_id: str = "node", 
+            pos: Optional[Tuple[float, float, float]] = (0, 0, 0), 
+            state: Optional[bool] = False, 
+            properties: Optional[List[str]] = None
     ):
-        if isinstance(pos, Tuple):
-            pos = Vector3(*pos)
         self.name = name
         self.block_id = block_id
         self.state = state
-        self.pos = pos
+        self.pos = Vector3(*pos) if pos else Vector3(0, 0, 0)
         self.properties = properties
 
-    def set_pos(self, pos: Tuple[float, float, float] | Vector3):
-        if isinstance(pos, Tuple):
-            pos = Vector3(*pos)
-        self.pos = pos
+    def set_pos(self, pos: Tuple[float, float, float]):
+        self.pos = Vector3(*pos)
 
     def savestring_encode(self):
         savestring_table = [
@@ -239,19 +270,17 @@ class Array:
     def __init__(
         self, 
         name: str, 
-        block_id: str="node",
-        pos: Tuple[float, float, float] | Vector3=(0, 0, 0),
-        width: int=None, 
-        info: Optional["ArrayInfo"]=None,
-        state=False, 
-        properties=None
+        block_id: str = "node",
+        pos: Optional[Tuple[float, float, float]] = (0, 0, 0),
+        width: Optional[int] = None, 
+        info: Optional["ArrayInfo"] = None,
+        state: Optional[bool] = False, 
+        properties: Optional[List[str]] = None
     ):
-        if isinstance(pos, Tuple):
-            pos = Vector3(*pos)
         self.name = name
         self.width = width 
         self.block_id = block_id
-        self.pos = pos
+        self.pos = Vector3(*pos) if pos else Vector3(0, 0, 0)
         self.state = state
         self.properties = properties
         default_info: ArrayInfo = {
@@ -273,8 +302,8 @@ class Array:
             default_info.update(info)
         self.info = default_info
 
-    def get_blocks(self) -> Dict:
-        blocks = {}
+    def get_blocks(self) -> Dict[str, Block]:
+        blocks: Dict[str, Block] = {}
         info = self.info
         assert self.width, "The size of the array must be defined"
         for i in range(self.width):
@@ -293,17 +322,15 @@ class Array:
             blocks[f"{self.name}.{i}"] = Block(
                 f"{self.name}.{i}",
                 self.block_id,
-                block_pos,
+                (block_pos.x, block_pos.y, block_pos.z),
                 self.state,
                 self.properties
             )
         
         return blocks
 
-    def set_pos(self, pos: Tuple[float, float, float] | Vector3):
-        if isinstance(pos, Tuple):
-            pos = Vector3(*pos)
-        self.pos = pos
+    def set_pos(self, pos: Tuple[float, float, float]):
+        self.pos = Vector3(*pos)
 
     def set_info(self, info: 'ArrayInfo'):
         default_info: ArrayInfo = {
@@ -341,7 +368,7 @@ class Wire:
         self.dst = dst
         self.inverted = inverted
 
-    def savestring_encode(self, block_indexes):
+    def savestring_encode(self, block_indexes: Dict[str, int]) -> str:
         assert self.src in block_indexes, f"Source component '{self.src}' not found"
         assert self.dst in block_indexes, f"Destination component '{self.dst}' not found"
         return f"{block_indexes[self.src]},{block_indexes[self.dst]}"
@@ -369,17 +396,22 @@ class Building():
         self, 
         name: str, 
         building_type: str, 
+        pos: Tuple[float, float, float], # Not implemented
         cframe: CFrame | Tuple[float, float, float],
         nwires: int = 0
     ):
         if isinstance(cframe, Tuple):
             cframe = CFrame(cframe)
         self.name = name
+        self.pos = Vector3(*pos)
         self.building_type = building_type
         self.cframe: CFrame = cframe
         if str.upper(self.building_type) in BuildingData.__members__:
             nwires = int(BuildingData[str.upper(self.building_type)].value["nwires"])
-        self.wires = [[] for _ in range(nwires)]
+        self.wires: List[List[BuildingWire]] = [[] for _ in range(nwires)]
+
+    def set_pos(self, pos: Tuple[float, float, float]):
+        self.pos = Vector3(*pos)
 
     def add_wire(self, building_wire: 'BuildingWire'):
         if isinstance(building_wire.index, str):
@@ -404,7 +436,7 @@ class Building():
 
             self.wires[index].append(building_wire)
 
-    def savestring_encode(self, block_indexes):
+    def savestring_encode(self, block_indexes: Dict[str, int]) -> str:
         assert isinstance(self.cframe.pos, Vector3)
 
         if str.upper(self.building_type) not in BuildingData.__members__:
@@ -431,20 +463,14 @@ class Building():
         for w in self.wires:
             if w == []: # Empty
                 savestring_table.append("")
-            elif isinstance(w, List):
+            else:
                 bwires_savestring = "+".join(_w.savestring_encode(block_indexes) for _w in w)
                 savestring_table.append(bwires_savestring)
 
         return ",".join(savestring_table)
     
-    def __repr__(self):
-        return (
-            f"Building("
-            f"{self.building_type}",
-            f"{self.cframe.pos}",
-            f"{self.cframe.rot}"
-            f")"
-        )
+    def __repr__(self) -> str:
+        return f"Building({self.name}, {self.building_type}, ...)"
 
 class BuildingWire():
     def __init__(self, buidling: str, index: str | int, port: str, src: str):
@@ -453,7 +479,7 @@ class BuildingWire():
         self.port = port
         self.src = src
 
-    def savestring_encode(self, block_indexes):
+    def savestring_encode(self, block_indexes: Dict[str, int]):
         return f"{Port[str.upper(self.port)]}{block_indexes[self.src]}"
     
     def __repr__(self):
@@ -470,30 +496,32 @@ class Module:
     """
     Base module class.
     """
-    def __init__(self, name: Optional[str]="main"):
+    def __init__(self, name: str="main"):
         self.name = name
-        self.blocks = {}
-        self.wires = {}
-        self.buildings = {}
-        self.ports = {}
+        self.blocks: Dict[str, Union[Block, Array]] = {}
+        self.wires: Dict[str, Wire] = {}
+        self.buildings: Dict[str, Building] = {}
+        self.ports: Dict[str, Union[str, List[str]]] = {}
         self.size = None
 
     def add(
         self,
-        components: Union[List, Block, Array, Wire, "Module", Building, BuildingWire]
+        components: Component
     ):
         if not isinstance(components, List):
             components = [components]
 
         components = flatten_recursive(components)
 
-        _blocks = []
-        _wires = []
+        _blocks: List[Construct] = []
+        _wires: List[Connection] = []
 
         for c in components:
-            if isinstance(c, Wire):
+            if istypeof(c, Connection):
+                c = cast(Connection, c)
                 _wires.append(c)
             else:
+                c = cast(Construct, c)
                 _blocks.append(c)
 
         for c in _blocks:
@@ -505,51 +533,57 @@ class Module:
                 self.blocks[c.name] = c
             elif isinstance(c, Module):
                 self.merge(c)
-            elif isinstance(c, Building):
+            else: # Building
                 self.buildings[c.name] = c
-            elif isinstance(c, BuildingWire):
-                building: Building = self.buildings[c.building]
-                building.add_wire(c)
+
 
         for w in _wires:
-            if w.src in self.blocks:         
-                src = self.blocks[w.src]
-            else: # Probably a block from an array or array name from developed array
-                # Check if it is a developed array
-                if f"{w.src}.0" in self.blocks:
-                    size = self.find_developed_array_size(w.src)
-                    src = Array("", width=size)
-                else:
-                    src = Block("") # Trust that it is a block from an array to be developed
-            if w.dst in self.blocks:
-                dst = self.blocks[w.dst]
-            else: # Probably a block from an array or array name from developed array
-                # Check if it is a developed array
-                if f"{w.dst}.0" in self.blocks:
-                    size = self.find_developed_array_size(w.dst)
-                    dst = Array("", width=size)
-                else:
-                    dst = Block("") # Trust that it is a block from an array to be developed
-            if isinstance(src, Array):
-                if isinstance(dst, Array):
-                    max_pairs = min(src.width, dst.width)
-                    if not w.inverted:
-                        for i in range(max_pairs):
-                            self.wires[f"{w.src}.{i}->{w.dst}.{i}"] = Wire(f"{w.src}.{i}", f"{w.dst}.{i}")
+            if isinstance(w, Wire):
+                if w.src in self.blocks:         
+                    src = self.blocks[w.src]
+                else: # Probably a block from an array or array name from developed array
+                    # Check if it is a developed array
+                    if f"{w.src}.0" in self.blocks:
+                        size = self.find_developed_array_size(w.src)
+                        src = Array("", width=size)
                     else:
-                        for i in range(max_pairs):
-                            self.wires[f"{w.src}.{i}->{w.dst}.{max_pairs - i - 1}"] = Wire(f"{w.src}.{i}", f"{w.dst}.{max_pairs - i - 1}")
-                elif isinstance(dst, Block):
-                    for i in range(src.width):
-                        self.wires[f"{w.src}.{i}->{w.dst}"] = Wire(f"{w.src}.{i}", f"{w.dst}")
-            elif isinstance(src, Block):
-                if isinstance(dst, Array):
-                    for i in range(dst.width):
-                        self.wires[f"{w.src}->{w.dst}.{i}"] = Wire(f"{w.src}", f"{w.dst}.{i}")
-                elif isinstance(dst, Block):
-                    self.wires[f"{w.src}->{w.dst}"] = w
+                        src = Block("") # Trust that it is a block from an array to be developed
+                if w.dst in self.blocks:
+                    dst = self.blocks[w.dst]
+                else: # Probably a block from an array or array name from developed array
+                    # Check if it is a developed array
+                    if f"{w.dst}.0" in self.blocks:
+                        size = self.find_developed_array_size(w.dst)
+                        dst = Array("", width=size)
+                    else:
+                        dst = Block("") # Trust that it is a block from an array to be developed
+                if isinstance(src, Array):
+                    if isinstance(dst, Array):
+                        src.width = cast(int, src.width)
+                        dst.width = cast(int, dst.width)
+                        max_pairs = min(src.width, dst.width)
+                        if not w.inverted:
+                            for i in range(max_pairs):
+                                self.wires[f"{w.src}.{i}->{w.dst}.{i}"] = Wire(f"{w.src}.{i}", f"{w.dst}.{i}")
+                        else:
+                            for i in range(max_pairs):
+                                self.wires[f"{w.src}.{i}->{w.dst}.{max_pairs - i - 1}"] = Wire(f"{w.src}.{i}", f"{w.dst}.{max_pairs - i - 1}")
+                    else: # Block
+                        src.width = cast(int, src.width)
+                        for i in range(src.width):
+                            self.wires[f"{w.src}.{i}->{w.dst}"] = Wire(f"{w.src}.{i}", f"{w.dst}")
+                else: # Block
+                    if isinstance(dst, Array):
+                        dst.width = cast(int, dst.width)
+                        for i in range(dst.width):
+                            self.wires[f"{w.src}->{w.dst}.{i}"] = Wire(f"{w.src}", f"{w.dst}.{i}")
+                    else: # Block
+                        self.wires[f"{w.src}->{w.dst}"] = w
+            else: # BuildingWire
+                building: Building = self.buildings[w.building]
+                building.add_wire(w)
 
-    def set_ports(self, value: Dict[str, list]):
+    def set_ports(self, value: Dict[str, Any]):
         assert len(value) > 0, "At least one port must be defined"
         self.ports = value
 
@@ -559,24 +593,17 @@ class Module:
         """
         self.size = size
 
-    def move(self, move_vector: Tuple[float, float, float] | Vector3):
+    def move(self, move_vector: Tuple[float, float, float]):
         """
         Move the entire module by a relative position
         """
-        if isinstance(move_vector, Tuple):
-            move_vector = Vector3(*move_vector)
         for c in self.blocks.values():
-            c.pos += move_vector
+            c.pos += Vector3(*move_vector)
 
-    def rotate(self, rotation_matrix: List[List[float]], pivot: Tuple[float, float, float] | Vector3=(0, 0, 0)):
+    def rotate(self, rotation_matrix: List[List[float]], pivot: Tuple[float, float, float]):
         """
         Rotate the module by a rotation matrix over a pivot
         """
-        if isinstance(pivot, Vector3):
-            pivot = (pivot.x, pivot.y, pivot.z)
-
-        pivot = np.array(pivot)  
-
         for c in self.blocks.values():
             pos = np.array((c.pos.x, c.pos.y, c.pos.z))
             translated = pos - pivot
@@ -589,6 +616,7 @@ class Module:
                     c.info.get("y_step"),
                     c.info.get("z_step")
                 )
+                orientation = cast(Tuple[float, float, float], orientation)
                 rot_orientation = np.dot(rotation_matrix, orientation)
                 c.info["x_step"]= rot_orientation[0]
                 c.info["y_step"] = rot_orientation[1]
@@ -607,13 +635,15 @@ class Module:
                 if isinstance(port, list):
                     j = 0
                     # This is because hdl.py:parse_json_module generates reversed port blocks
-                    _port = port[::-1]
+                    _port = cast(List[str], port[::-1])
                     for p in _port:
                         block = self.get_block(p)
+                        assert block, f"Block '{p}' from input port doesn't exist"
                         block.set_pos((j, i, 1))
                         j += 1
-                elif isinstance(port, str):
+                else: # str
                     block = self.get_block(port)
+                    assert block, f"Block '{port}' from input port doesn't exist"
                     block.set_pos((0, i, 1))
                 i += 1
                 
@@ -622,17 +652,19 @@ class Module:
             for port in self.ports["output"]:
                 if isinstance(port, list):
                     j = 0
-                    _port = port[::-1]
+                    _port = cast(List[str], port[::-1])
                     for p in _port:
                         block = self.get_block(p)
+                        assert block, f"Block '{p}' from output port doesn't exist"
                         block.set_pos((j, i, -1))
                         j += 1
-                elif isinstance(port, str):
+                else: # str
                     block = self.get_block(port)
+                    assert block, f"Block '{port}' from output port doesn't exist"
                     block.set_pos((0, i, -1))
                 i += 1
 
-    def get_center(self, ndigits=0) -> Vector3:
+    def get_center(self, ndigits: int = 0) -> Vector3:
         blocks = self.get_blocks()
         mean = Vector3(0, 0, 0)
         for block in blocks:
@@ -650,8 +682,8 @@ class Module:
         dims = (max_v - min_v) + Vector3.ones()
         return dims
 
-    def get_block_indexes(self):
-        block_indexes = {}
+    def get_block_indexes(self) -> Dict[str, int]:
+        block_indexes: Dict[str, int] = {}
 
         index = 1
         for c in self.blocks.values():
@@ -666,8 +698,8 @@ class Module:
 
         return block_indexes
     
-    def get_blocks(self):
-        blocks = []
+    def get_blocks(self) -> List[Block]:
+        blocks: List[Block] = []
         for c in self.blocks.values():
             if isinstance(c, Block):
                 blocks.append(c)
@@ -678,31 +710,32 @@ class Module:
 
         return blocks
 
-    def get_wires(self):
-        wires = []
+    def get_wires(self) -> List[Wire]:
+        wires: List[Wire] = []
         for w in self.wires.values():
             wires.append(w)
         return wires
 
-    def get_buildings(self):
-        buildings = []
+    def get_buildings(self) -> List[Building]:
+        buildings: List[Building] = []
         for w in self.buildings.values():
             buildings.append(w)
         return buildings
     
-    def get_block(self, name: str) -> Block | Array:
+    def get_block(self, name: str) -> Union[Block, Array, None]:
         """
         Return a block/array component from self.blocks
         """
         return self.blocks.get(name)
 
-    def find_developed_array_size(self, src):
+    def find_developed_array_size(self, src: str) -> int:
         """
         Find the width of a developed array, an array that was
         created through blocks with enumerated names instead
         of using Array object.
         """
         bottom, top = 0, 32
+        mid = 0
         while f"{src}.{top - 1}" in self.blocks:
             bottom = top
             top *= 2
@@ -719,7 +752,7 @@ class Module:
 
         return mid
 
-    def save(self, path):
+    def save(self, path: str):
         """Export module as a Circuit Maker 2 save string."""
         block_list = self.get_blocks()
         block_indexes = self.get_block_indexes()
@@ -746,7 +779,7 @@ class Module:
         for name, wire in other.wires.items():
             self.wires[f"{other.name}.{name}"] = Wire(f"{other.name}.{wire.src}", f"{other.name}.{wire.dst}")
 
-    def show_components(self, wires=False):
+    def show_components(self, wires: bool = False):
         for k, b in self.blocks.items():
             print(f"{k}: {b}")
 
