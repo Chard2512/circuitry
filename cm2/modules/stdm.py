@@ -1,4 +1,4 @@
-from cm2.circuitry import *
+from cm2.circuitry.core import *
 from cm2.utils import closest_divisors
 
 def Adder(name: str, size: int, pos: Tuple[float, float, float] = (0, 0, 0)):

@@ -1,6 +1,6 @@
 # hdl.py
 # Compiles Hardware Description Language to game's logic
-from .circuitry import *
+from .core import *
 from .builder import *
 from cm2.utils import flatten_recursive, random_id
 from cm2.modules.hdlm import *

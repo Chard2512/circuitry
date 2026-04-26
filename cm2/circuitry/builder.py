@@ -1,4 +1,4 @@
-from .circuitry import *
+from .core import *
 from cm2.modules.stdm import *
 
 def ArrayOf(
