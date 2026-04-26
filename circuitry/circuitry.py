@@ -2,16 +2,6 @@
 Library for savestring generation and manipulation for Circuit Maker 2 game
 """
 
-__author__ = "Chard"
-__contact__ = "chardson.coelho17@gmail.com"
-__copyright__ = "Copyright 2025, Chard2512"
-__date__ = "2025/05/27"
-__deprecated__ = False
-__license__ = "MIT"
-__maintainer__ = "Chard"
-__status__ = "Production"
-__version__ = "0.3"
-
 import numpy as np
 from dataclasses import dataclass, field
 from typing import cast, List, TypedDict, Optional, Tuple, Dict, Union, Literal
