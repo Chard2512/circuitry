@@ -232,8 +232,8 @@ class Block:
             self, 
             name: str, 
             block_id: str = "node", 
-            pos: Optional[Tuple[float, float, float]] = (0, 0, 0), 
-            state: Optional[bool] = False, 
+            pos: Tuple[float, float, float] = (0, 0, 0), 
+            state: bool = False, 
             properties: Optional[List[str]] = None
     ):
         self.name = name
@@ -271,10 +271,10 @@ class Array:
         self, 
         name: str, 
         block_id: str = "node",
-        pos: Optional[Tuple[float, float, float]] = (0, 0, 0),
+        pos: Tuple[float, float, float] = (0, 0, 0),
         width: Optional[int] = None, 
         info: Optional["ArrayInfo"] = None,
-        state: Optional[bool] = False, 
+        state: bool = False, 
         properties: Optional[List[str]] = None
     ):
         self.name = name
