@@ -1,5 +1,12 @@
+OS := $(shell uname)
+
 PYTHON = python
-SYNTHESIZER = synth.sh
+ifeq ($(OS),Linux)
+	SYNTHESIZER = synth.sh
+	CLEAN = @rm -f build/*
+else ifeq($(OS),Windows)
+	SYNTHESIZER = synth.sh
+	CLEAN = @del /f build\*
 COMPILER = compile.py
 
 # Set your project name here
@@ -25,4 +32,4 @@ $(SYNTH_OUTPUT):
 	./$(SYNTHESIZER) $(SYNTH_OUTPUT) $(ENTRY_MODULE) $(VERILOG_FILES)
 
 clean:
-	@rm -f build/*
+	$(CLEAN)
