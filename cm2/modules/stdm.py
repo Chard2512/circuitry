@@ -145,7 +145,7 @@ def HalfAdder(name: str, pos: Tuple[float, float, float] = (0, 0, 0)):
     a.move(pos)
     return a
 
-def DFF(name: str, size: int, pos: Tuple[float, float, float] = (0, 0, 0)):
+def Latch(name: str, size: int, pos: Tuple[float, float, float] = (0, 0, 0)):
     ff = Module(name)
     ff.set_size(size)
     ff.set_ports({
