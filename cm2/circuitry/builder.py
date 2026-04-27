@@ -5,20 +5,6 @@ Defines an easier interface for blocks/arrays/wire building, abstracting on top 
 
 from .core import *
 from cm2.modules.stdm import *
-from typing import Callable
-
-GateCallable: TypeAlias = Callable[
-    [
-        str,
-        List[str] | str,
-        Tuple[float, float, float],
-        bool,
-        Optional[List[str]],
-        Optional[Dict[str, int]],
-        Optional[Dict[str, bool]]
-    ],
-    List[PrimitiveComponent]
-]
 
 def ArrayOf(
         component: List[PrimitiveComponent],
