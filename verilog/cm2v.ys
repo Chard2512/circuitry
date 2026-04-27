@@ -1,5 +1,0 @@
-proc; opt; fsm; opt; memory; opt; techmap; opt;
-
-abc -g AND,OR,XOR,NAND,NOR,XNOR
-
-extract_reduce; opt; flatten; opt; clean -purge; opt
