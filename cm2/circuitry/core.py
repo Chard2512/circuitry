@@ -48,10 +48,6 @@ RotationOrder: TypeAlias = Literal['xyz', 'xzy', 'yxz', 'yzx', 'zxy', 'zyx']
 
 BIG_INT = 2147483647
 
-def istypeof(value: Any, union_type: Any) -> bool:
-    types = get_args(union_type)
-    return type(value) in types
-
 # Pre-defined block_id definitions
 class BlockID(IntEnum):
     NOR = 0
@@ -519,8 +515,7 @@ class Module:
         _wires: List[Connection] = []
 
         for c in components:
-            if istypeof(c, Connection):
-                c = cast(Connection, c)
+            if isinstance(c, Wire) or isinstance(c, BuildingWire):
                 _wires.append(c)
             else:
                 c = cast(Construct, c)
