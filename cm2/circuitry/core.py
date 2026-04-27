@@ -5,7 +5,7 @@ Defines all primitive classes for savestring manipulation.
 
 import numpy as np
 from dataclasses import dataclass, field
-from typing import cast, Any, List, TypedDict, Optional, Tuple, Dict, Union, Literal, TypeAlias, get_args
+from typing import cast, Any, List, TypedDict, Optional, Tuple, Dict, Union, Literal, TypeAlias
 import math
 from enum import IntEnum, Enum
 from types import MappingProxyType
