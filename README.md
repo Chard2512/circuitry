@@ -10,7 +10,7 @@ The following must be in your `PATH`:
 
 For Verilog support:
 
-- Yosys 0.63
+- Yosys 0.64
 - Make (for automated Verilog compilation at `examples/verilog`)
 
 ## Levels of abstraction
