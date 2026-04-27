@@ -1,6 +1,6 @@
+OS := $(shell uname)
+
 PYTHON = python
-# If you're on Windows, you need to change synth.sh to synth.bat to make
-# this works.
 ifeq ($(OS),Linux)
 	SYNTHESIZER = synth.sh
 	CLEAN = @rm -f build/*
