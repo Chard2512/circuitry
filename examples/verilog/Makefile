@@ -1,10 +1,10 @@
 PYTHON = python
-ifeq ($(OS),Linux)
-	SYNTHESIZER = ./synth.sh
-	CLEAN = @rm -f build/*
-else ifeq ($(OS),Windows_NT)
+ifeq ($(OS),Windows_NT)
 	SYNTHESIZER = synth.bat
 	CLEAN = @del /f build\*
+else
+	SYNTHESIZER = ./synth.sh
+	CLEAN = @rm -f build/*
 endif
 COMPILER = compile.py
 
