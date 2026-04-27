@@ -4,7 +4,6 @@ Defines an easier interface for blocks/arrays/wire building, abstracting on top 
 """
 
 from .core import *
-from cm2.modules.stdm import *
 
 def ArrayOf(
         component: List[PrimitiveComponent],
