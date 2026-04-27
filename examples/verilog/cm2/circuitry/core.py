@@ -97,18 +97,18 @@ class Vector3:
     z: float
 
     @staticmethod
-    def zeros() -> Vector3:
+    def zeros() -> 'Vector3':
         return Vector3(0, 0, 0)
     
     @staticmethod
-    def ones() -> Vector3:
+    def ones() -> 'Vector3':
         return Vector3(1, 1, 1)
 
-    def normalize(self) -> Vector3:
+    def normalize(self) -> 'Vector3':
         length = math.sqrt(self.x**2 + self.y**2 + self.z**2)
         return Vector3(self.x / length, self.y / length, self.z / length)
     
-    def cross(self, other: 'Vector3') -> Vector3:
+    def cross(self, other: 'Vector3') -> 'Vector3':
         return Vector3(
             self.y * other.z - self.z * other.y,
             self.z * other.x - self.x * other.z,
@@ -129,10 +129,10 @@ class Vector3:
             max(self.z, other.z)
         )
 
-    def __add__(self, other: Vector3):
+    def __add__(self, other: 'Vector3'):
         return Vector3(self.x + other.x, self.y + other.y, self.z + other.z)
 
-    def __sub__(self, other: Vector3):
+    def __sub__(self, other: 'Vector3'):
         return Vector3(self.x - other.x, self.y - other.y, self.z - other.z)
     
     def __truediv__(self, other: float | int):
