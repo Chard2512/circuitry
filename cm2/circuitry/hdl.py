@@ -1,12 +1,11 @@
 # hdl.py
 # Compiles Hardware Description Language to game's logic
-from .core import *
 from .builder import *
-from cm2.utils import flatten_recursive, random_id
+from cm2.utils import random_id
 from cm2.modules.hdlm import *
 import json
 
-gate_map = {
+gate_map: Dict[str, Any] = {
     "$reduce_and": And,
     "$and": And,
     "$_AND_": And,
@@ -31,23 +30,27 @@ gate_map = {
     "$_DFF_P_": DFFP
 }
 
-def parse_json_module(name, json_module) -> Module:
+def parse_json_module(name: str, json_module: Dict[str, Any]) -> Module:
     ports = json_module["ports"]
     cells = json_module["cells"]
 
-    components = []
+    components: List[Any] = []
     m = Module(name)
     m.set_ports({
         "input": [],
         "output": []
     })
 
-    def is_bit_on_ports(bit):
-        return (bit in flatten_recursive(m.ports["input"]) or bit in flatten_recursive(m.ports["output"]))
-
+    def is_bit_on_ports(bit: str):
+        if "input" in m.ports and type(m.ports["input"]) == List[str]:
+            if bit in m.ports["input"]: return True
+        if "output" in m.ports and type(m.ports["output"] == List[str]):
+            if bit in m.ports["output"]: return True
+        return False
+    
     for port in ports.values():
         if port["direction"] == "input":
-            p = []
+            p: List[str] = []
             for bit in port["bits"]:
                 if isinstance(bit, str):
                     this_id = random_id()
@@ -65,7 +68,7 @@ def parse_json_module(name, json_module) -> Module:
                     else:
                         components.append(Node(block_name))
                         p.append(block_name)
-            m.ports["input"].append(p)
+            m.get_port("input").append(p)
         elif port["direction"] == "output":
             p = []
             for bit in port["bits"]:
@@ -94,6 +97,7 @@ def parse_json_module(name, json_module) -> Module:
         block_name = cell_name
         cell_type = cell["type"]
         
+        outputs: List[str] = []
         if "Y" in cell["connections"]:
             outputs = [str(i) for i in cell["connections"]["Y"]]
         elif "Q" in cell["connections"]:
@@ -189,12 +193,12 @@ def parse_json_module(name, json_module) -> Module:
     m.auto_place()
     return m
 
-def json2module(filepath: str) -> Dict[str, Module]:
+def json_to_module(filepath: str) -> Dict[str, Module]:
     """
     Compiles json hdl to Module
     """
 
-    compiled_modules = {}
+    compiled_modules: Dict[str, Module] = {}
 
     with open(filepath) as file:
         jsonhdl = json.load(file)
@@ -204,4 +208,17 @@ def json2module(filepath: str) -> Dict[str, Module]:
     for module_name, module in modules.items():
         compiled_modules[module_name] = parse_json_module(module_name, module)
 
+    return compiled_modules
+
+def jsons_to_module(filepaths: List[str]) -> Dict[str, Module]:
+    """
+    Compiles multiple json hdl to Module
+    """
+
+    compiled_modules: Dict[str, Module] = {}
+
+    for filepath in filepaths:
+        child_compiled_modules = json_to_module(filepath)
+        compiled_modules.update(child_compiled_modules)
+        
     return compiled_modules

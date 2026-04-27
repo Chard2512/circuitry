@@ -39,7 +39,7 @@ def ArrayOf(
         return new_list
     return convert_block_to_array(component)
 
-def _make_gate(block_id: str) -> GateCallable:
+def _make_gate(block_id: str):
     def gate(
         name: str, 
         outputs: List[str] | str = [],
@@ -65,7 +65,7 @@ def _make_gate(block_id: str) -> GateCallable:
                 else:
                     components.append(Wire(name, output))
         return components
-    
+
     return gate
 
 Nor = _make_gate("nor")

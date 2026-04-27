@@ -12,7 +12,8 @@ from cm2.utils import flatten_recursive
 
 Component: TypeAlias = Union[
     "Block", "Array", "Wire", "Module", "Building", "BuildingWire",
-    List["Component"]
+    List["Component"], List["ConstructComponent"], List["ConnectionComponent"],
+    List["PrimitiveComponent"]
 ]
 
 ConstructComponent: TypeAlias = Union[
@@ -501,7 +502,7 @@ class Module:
         self.blocks: Dict[str, Union[Block, Array]] = {}
         self.wires: Dict[str, Wire] = {}
         self.buildings: Dict[str, Building] = {}
-        self.ports: Dict[str, Union[str, List[str]]] = {}
+        self.ports: Dict[str, Any] = {}
         self.size = None
 
     def add(
@@ -587,6 +588,16 @@ class Module:
         assert len(value) > 0, "At least one port must be defined"
         self.ports = value
 
+    def insert_port(self, name: str, port: str, index: Optional[int]):
+        assert self.ports[port], f"Port '{port}' doesn't exist"
+
+        if type(self.ports[port]) == List[str]:
+            self.ports[port].append(name)
+        else:
+            assert self.ports[port][index], f"Index '{index}' of port '{port}' doesn't exist"
+            assert type(self.ports[port][index]) == List[str], f"The chosen index '{index}' of port '{port}' is a nested list"
+            self.ports[port][index].append(name)
+
     def set_size(self, size: int):
         """
         Set default arrays' size
@@ -663,6 +674,9 @@ class Module:
                     assert block, f"Block '{port}' from output port doesn't exist"
                     block.set_pos((0, i, -1))
                 i += 1
+
+    def get_port(self, port: str):
+        return self.ports[port]
 
     def get_center(self, ndigits: int = 0) -> Vector3:
         blocks = self.get_blocks()

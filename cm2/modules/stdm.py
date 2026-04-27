@@ -232,16 +232,16 @@ def Mux(name: str, data_size: int, addr_size: int, pos: Tuple[float, float, floa
         ] for i in range(num_gates) ]
     ])
     # Decoder repositioning
-    input_array: Array = mux.blocks.get(f"decoder.input")
-    nor_array: Array = mux.blocks.get(f"decoder.nor_gate")
-    or_array: Array = mux.blocks.get(f"decoder.or_gate")
+    input_array = cast(Array, mux.blocks.get(f"decoder.input"))
+    nor_array = cast(Array, mux.blocks.get(f"decoder.nor_gate"))
+    or_array = cast(Array, mux.blocks.get(f"decoder.or_gate"))
     input_array.set_pos((data_size + 1, 0, 1))
     nor_array.set_pos((data_size, 0, 1))
     nor_array.set_info(ArrayInfo(x_step=0))
     or_array.set_pos((data_size, 0, 1))
     or_array.set_info(ArrayInfo(x_step=0))
     for i in range(num_gates):
-        decoder_block: Block = mux.blocks.get(f"decoder.output.{i}")
+        decoder_block = cast(Block, mux.blocks.get(f"decoder.output.{i}"))
         decoder_block.set_pos((data_size, 0, -i))
 
     mux.move(pos)
