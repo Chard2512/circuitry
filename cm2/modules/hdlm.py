@@ -1,3 +1,8 @@
+"""cm2/modules/hdlm.py
+
+Extended modules, used primarly by 'cm2/circuitry/hdl.py'
+"""
+
 from cm2.circuitry.builder import *
 
 def DLatchP(name: str, pos: Tuple[float, float, float] = (0, 0, 0)):

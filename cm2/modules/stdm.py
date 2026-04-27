@@ -1,3 +1,8 @@
+"""cm2/modules/stdm.py
+
+The standard modules
+"""
+
 from cm2.circuitry.core import *
 from cm2.utils import closest_divisors
 

@@ -1,5 +1,8 @@
-# hdl.py
-# Compiles Hardware Description Language to game's logic
+"""cm2/circuitry/hdl.py
+
+Functions for Hardware Description Language compilation
+"""
+
 from .builder import *
 from cm2.utils import random_id
 from cm2.modules.hdlm import *

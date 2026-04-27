@@ -1,3 +1,8 @@
+"""cm2/circuitry/builder.py
+
+Defines an easier interface for blocks/arrays/wire building, abstracting on top of 'core.py'.
+"""
+
 from .core import *
 from cm2.modules.stdm import *
 from typing import Callable

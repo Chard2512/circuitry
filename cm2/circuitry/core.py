@@ -1,5 +1,6 @@
-"""
-Library for savestring generation and manipulation for Circuit Maker 2 game
+"""cm2/circuitry/core.py
+
+Defines all primitive classes for savestring manipulation.
 """
 
 import numpy as np
