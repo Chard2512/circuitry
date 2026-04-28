@@ -30,6 +30,8 @@ endmodule
 // The auto_place function requires matrices to separated into rows,
 // in order to build them as matrices, that's why the matricies are ugly 
 // defined like this. This is something that will change.
+
+// Minimum clock delay is 14 ticks
 module life ( 
     input [7:0] data0,
     input [7:0] data1,
