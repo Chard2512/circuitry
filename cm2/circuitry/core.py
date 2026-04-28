@@ -684,7 +684,7 @@ class Module:
                     block.set_pos((0, i, -1))
                 i += 1
 
-    def auto_balance(self):
+    def auto_balance(self) -> int:
         """This ensures all paths from any input to any output takes the same number of ticks"""
         assert "input" in self.ports, "Module doesn't have input port defined"
         assert "output" in self.ports, "Module doesn't have output port defined"
@@ -751,7 +751,37 @@ class Module:
                     block.block_id = "delay"
                     block.properties = [f"{delay}"]
                     
+        return slowest_output_arrival_time
+                    
+    def def_ic(self):
+        """Put IC terminals on module"""
+        assert "input" in self.ports, "Module doesn't have input port defined"
+        assert "output" in self.ports, "Module doesn't have output port defined"
+        input_ports = flatten_recursive(self.ports["input"])
+        output_ports = flatten_recursive(self.ports["output"])
+        
+        assert len(input_ports) <= 32, "Module has too many inputs"
+        assert len(output_ports) <= 32, "Module has too many outputs"
+
+        character = ord('A')
+        for i in input_ports:
+            self.add([
+                Block(f"_IC_.input.{i}", "text", properties=[f"{character}"]),
+                Block(f"_IC_.input.{i}.or", "or"),
+                Wire(f"_IC_.input.{i}", f"_IC_.input.{i}.or"),
+                Wire(f"_IC_.input.{i}.or", f"{i}")
+            ])
+            character += 1
             
+        character = ord('A')
+        for i in output_ports:
+            self.add([
+                Block(f"_IC_.output.{i}", "text", properties=[f"{character}"]),
+                Block(f"_IC_.output.{i}.or", "or"),
+                Wire(f"{i}", f"_IC_.output.{i}.or"),
+                Wire(f"_IC_.output.{i}.or", f"_IC_.output.{i}")
+            ])
+            character += 1
 
     def get_port(self, port: str) -> List[Any]:
         """Returns list of elements in a port"""
