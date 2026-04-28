@@ -45,10 +45,10 @@ def parse_json_module(name: str, json_module: Dict[str, Any]) -> Module:
     })
 
     def is_bit_on_ports(bit: str):
-        if "input" in m.ports and type(m.ports["input"]) == List[str]:
-            if bit in m.ports["input"]: return True
-        if "output" in m.ports and type(m.ports["output"] == List[str]):
-            if bit in m.ports["output"]: return True
+        if "input" in m.ports:
+            if bit in flatten_recursive(m.ports["input"]): return True
+        if "output" in m.ports:
+            if bit in flatten_recursive(m.ports["output"]): return True
         return False
     
     for port in ports.values():

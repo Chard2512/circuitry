@@ -9,7 +9,7 @@ from typing import cast, Any, List, TypedDict, Optional, Tuple, Dict, Union, Lit
 import math
 from enum import IntEnum, Enum
 from types import MappingProxyType
-from cm2.utils import flatten_recursive
+from cm2.utils import flatten_recursive, random_id
 
 Component: TypeAlias = Union[
     "Block", "Array", "Wire", "Module", "Building", "BuildingWire",
@@ -580,6 +580,19 @@ class Module:
                 building: Building = self.buildings[w.building]
                 building.add_wire(w)
 
+    def remove(self, name: str):
+        block = self.get_block(name)
+        if block:
+            del self.blocks[name]
+            
+        wire = self.get_wire(name)
+        if wire:
+            del self.wires[name]
+            
+        building = self.get_wire(name)
+        if building:
+            del self.buildings[name]
+
     def set_ports(self, value: Dict[str, Any]):
         assert len(value) > 0, "At least one port must be defined"
         self.ports = value
@@ -671,7 +684,77 @@ class Module:
                     block.set_pos((0, i, -1))
                 i += 1
 
-    def get_port(self, port: str):
+    def auto_balance(self):
+        """This ensures all paths from any input to any output takes the same number of ticks"""
+        assert "input" in self.ports, "Module doesn't have input port defined"
+        assert "output" in self.ports, "Module doesn't have output port defined"
+        
+        graph = self.get_block_graph()
+        module_outputs: List[str] = []
+        for outputs in self.get_port("output"):
+            _outputs = flatten_recursive(outputs)
+            for p in _outputs:
+                expanded = self.get_blocks_expanded(p)
+                if expanded:
+                    for block in expanded:
+                        module_outputs.append(block.name) 
+            
+        def get_arrival_time(block: Block) -> int:
+            times = get_input_arrival_times(block)
+            if len(times) == 0:
+                return 0
+            else:
+                return max(times.values())
+       
+        def get_input_arrival_times(block: Block) -> Dict[str, int]:
+            inputs = graph[block.name]["inputs"]
+            times: Dict[str, int] = {}
+            for i in inputs:
+                times[i["block"].name] = get_arrival_time(i["block"]) + 1
+            return times
+            
+        def insert_input_delays(block: Block) -> int:
+            times = get_input_arrival_times(block)
+            slowest = get_arrival_time(block)
+            
+            for input_name, time in times.items():
+                delay = slowest - time
+                if delay > 0:
+                    wire = self.get_wire(f"{input_name}->{block.name}")
+                    if wire:
+                        self.remove(f"{input_name}->{block.name}")
+                        
+                    this_id = random_id()
+                    self.add([
+                        Block(f"{input_name}.delay.{this_id}", "delay", properties=[f"{delay}"]),
+                        Wire(f"{input_name}", f"{input_name}.delay.{this_id}"),
+                        Wire(f"{input_name}.delay.{this_id}", block.name)
+                    ])
+            return slowest
+        
+        output_arrival_times: Dict[str, int] = {}
+        
+        nodes = graph.keys()
+        for node in nodes:
+            content = graph[node]
+            arrival_time = insert_input_delays(content["block"])
+            if content["block"].name in module_outputs:
+                output_arrival_times[content["block"].name] = arrival_time
+        
+        slowest_output_arrival_time: int = max(output_arrival_times.values())
+        for _output, time in output_arrival_times.items():
+            delay = slowest_output_arrival_time - time
+            
+            if delay > 0:
+                block = self.get_block(_output)
+                if block:
+                    block.block_id = "delay"
+                    block.properties = [f"{delay}"]
+                    
+            
+
+    def get_port(self, port: str) -> List[Any]:
+        """Returns list of elements in a port"""
         return self.ports[port]
 
     def get_center(self, ndigits: int = 0) -> Vector3:
@@ -720,6 +803,29 @@ class Module:
 
         return blocks
 
+    def get_block_graph(self) -> Dict[str, Dict[str, Any]]:
+        blocks: Dict[str, Dict[str, Any]] = {}
+        for k, c in self.blocks.items():
+            k: str
+            if isinstance(c, Block):
+                blocks[k] = {"block": c, "inputs": [], "outputs": []}
+            if isinstance(c, Array):
+                array_blocks = c.get_blocks()
+                for j, b in array_blocks.items():
+                    blocks[j] = {"block": b, "inputs": [], "outputs": []}
+                    
+        for w in self.wires.values():
+            if w.src in blocks:
+                dst_block = blocks[w.dst]
+                blocks[w.src]["outputs"].append(dst_block)
+            
+            if w.dst in blocks:
+                src_block = blocks[w.src]
+                blocks[w.dst]["inputs"].append(src_block)
+
+        return blocks
+        
+
     def get_wires(self) -> List[Wire]:
         wires: List[Wire] = []
         for w in self.wires.values():
@@ -732,11 +838,32 @@ class Module:
             buildings.append(w)
         return buildings
     
-    def get_block(self, name: str) -> Union[Block, Array, None]:
+    def get_block(self, name: str) -> Optional[Union[Block, Array]]:
         """
         Return a block/array component from self.blocks
         """
         return self.blocks.get(name)
+
+    def get_blocks_expanded(self, name: str) -> Optional[List[Block]]:
+        """Return a block or expanded list of blocks from an array"""
+        component = self.blocks.get(name)
+        if component:
+            if isinstance(component, Array):
+                return [block for block in component.get_blocks().values()]
+            else:
+                return [component]
+
+    def get_wire(self, name: str) -> Optional[Wire]:
+        """
+        Return a wire component from self.wires
+        """
+        return self.wires.get(name)
+
+    def get_building(self, name: str) -> Optional[Building]:
+        """
+        Return a building component from self.wires
+        """
+        return self.buildings.get(name)
 
     def find_developed_array_size(self, src: str) -> int:
         """
