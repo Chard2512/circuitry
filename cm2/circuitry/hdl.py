@@ -51,29 +51,36 @@ def parse_json_module(name: str, json_module: Dict[str, Any]) -> Module:
             if bit in flatten_recursive(m.ports["output"]): return True
         return False
     
-    for port in ports.values():
+    for port_name, port in ports.items():
+        i = 0
         if port["direction"] == "input":
             p: List[str] = []
             for bit in port["bits"]:
                 if isinstance(bit, str):
                     this_id = random_id()
+                    m.set_link(f"{port_name}.{i}", this_id)
+                    i += 1
                     components.append(Node(this_id))
                     p.append(this_id)
                 else:
                     block_name = f"{bit}"
                     if block_name in p:
                         this_id = random_id()
+                        m.set_link(f"{port_name}.{i}", this_id)
+                        i += 1
                         components.append([
                             Node(this_id),
                             Wire(block_name, this_id)
                         ])
                         p.append(this_id)
                     else:
+                        m.set_link(f"{port_name}.{i}", block_name)
+                        i += 1
                         components.append(Node(block_name))
                         p.append(block_name)
             m.get_port("input").append(p)
         elif port["direction"] == "output":
-            p = []
+            p: list[str] = []
             for bit in port["bits"]:
                 if isinstance(bit, str):
                     this_id = random_id()
@@ -81,17 +88,23 @@ def parse_json_module(name: str, json_module: Dict[str, Any]) -> Module:
                         components.append(Node(this_id))
                     else:
                         components.append(Flipflop(this_id, state=True))
+                    m.set_link(f"{port_name}.{i}", this_id)
+                    i += 1
                     p.append(this_id)
                 else:
                     block_name = f"{bit}"
                     if block_name in p or is_bit_on_ports(block_name):
                         this_id = random_id()
+                        m.set_link(f"{port_name}.{i}", this_id)
+                        i += 1
                         components.append([
                             Node(this_id),
                             Wire(block_name, this_id)
                         ])
                         p.append(this_id)
                     else:
+                        m.set_link(f"{port_name}.{i}", block_name)
+                        i += 1
                         components.append(Node(block_name))
                         p.append(block_name)
             m.ports["output"].append(p)
