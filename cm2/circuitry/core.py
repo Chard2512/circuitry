@@ -689,6 +689,8 @@ class Module:
         assert "input" in self.ports, "Module doesn't have input port defined"
         assert "output" in self.ports, "Module doesn't have output port defined"
         
+        arrival_times: Dict[str, int] = {} # cache get_arrival_time results
+        
         graph = self.get_block_graph()
         module_outputs: List[str] = []
         for outputs in self.get_port("output"):
@@ -700,11 +702,17 @@ class Module:
                         module_outputs.append(block.name) 
             
         def get_arrival_time(block: Block) -> int:
-            times = get_input_arrival_times(block)
-            if len(times) == 0:
-                return 0
+            if block.name in arrival_times:
+                return arrival_times[block.name]
             else:
-                return max(times.values())
+                times = get_input_arrival_times(block)
+                if len(times) == 0:
+                    arrival_times[block.name] = 0
+                    return 0
+                else:
+                    time = max(times.values())
+                    arrival_times[block.name] = time
+                    return time
        
         def get_input_arrival_times(block: Block) -> Dict[str, int]:
             inputs = graph[block.name]["inputs"]
