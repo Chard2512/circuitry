@@ -500,6 +500,7 @@ class Module:
         self.wires: Dict[str, Wire] = {}
         self.buildings: Dict[str, Building] = {}
         self.ports: Dict[str, Any] = {}
+        self.links: Dict[str, str] = {}
         self.size = None
 
     def add(
@@ -536,6 +537,8 @@ class Module:
 
         for w in _wires:
             if isinstance(w, Wire):
+                w.src = self.get_reference(w.src)
+                w.dst = self.get_reference(w.dst)
                 if w.src in self.blocks:         
                     src = self.blocks[w.src]
                 else: # Probably a block from an array or array name from developed array
@@ -581,6 +584,8 @@ class Module:
                 building.add_wire(w)
 
     def remove(self, name: str):
+        name = self.get_reference(name)
+        
         block = self.get_block(name)
         if block:
             del self.blocks[name]
@@ -606,6 +611,9 @@ class Module:
             assert self.ports[port][index], f"Index '{index}' of port '{port}' doesn't exist"
             assert type(self.ports[port][index]) == List[str], f"The chosen index '{index}' of port '{port}' is a nested list"
             self.ports[port][index].append(name)
+
+    def set_link(self, link: str, to: str):
+        self.links[link] = to
 
     def set_size(self, size: int):
         """
@@ -863,7 +871,12 @@ class Module:
 
         return blocks
         
-
+    def get_reference(self, name: str) -> str:
+        if name in self.links:
+            return self.links[name]
+        else:
+            return name 
+        
     def get_wires(self) -> List[Wire]:
         wires: List[Wire] = []
         for w in self.wires.values():
@@ -880,10 +893,13 @@ class Module:
         """
         Return a block/array component from self.blocks
         """
+        name = self.get_reference(name)
         return self.blocks.get(name)
 
     def get_blocks_expanded(self, name: str) -> Optional[List[Block]]:
         """Return a block or expanded list of blocks from an array"""
+        name = self.get_reference(name)
+        
         component = self.blocks.get(name)
         if component:
             if isinstance(component, Array):
@@ -895,12 +911,14 @@ class Module:
         """
         Return a wire component from self.wires
         """
+        name = self.get_reference(name)
         return self.wires.get(name)
 
     def get_building(self, name: str) -> Optional[Building]:
         """
         Return a building component from self.wires
         """
+        name = self.get_reference(name)
         return self.buildings.get(name)
 
     def find_developed_array_size(self, src: str) -> int:
@@ -909,6 +927,7 @@ class Module:
         created through blocks with enumerated names instead
         of using Array object.
         """
+        src = self.get_reference(src)
         bottom, top = 0, 32
         mid = 0
         while f"{src}.{top - 1}" in self.blocks:
