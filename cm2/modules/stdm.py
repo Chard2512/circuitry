@@ -210,7 +210,7 @@ def Decoder(name: str, size: int, pos: Tuple[float, float, float] = (0, 0, 0)):
     dc.move(pos)
     return dc
 
-def Mux(name: str, data_size: int, addr_size: int, pos: Tuple[float, float, float] = (0, 0, 0)):
+def MuxExtended(name: str, data_size: int, addr_size: int, pos: Tuple[float, float, float] = (0, 0, 0)):
     mux = Module(name)
     mux.set_size(data_size)
     mux.set_ports({
@@ -248,6 +248,48 @@ def Mux(name: str, data_size: int, addr_size: int, pos: Tuple[float, float, floa
     for i in range(num_gates):
         decoder_block = cast(Block, mux.blocks.get(f"decoder.output.{i}"))
         decoder_block.set_pos((data_size, 0, -i))
+
+    mux.move(pos)
+    return mux
+
+def Mux(name: str, data_size: int, addr_size: int, pos: Tuple[float, float, float] = (0, 0, 0)):
+    mux = Module(name)
+    mux.set_size(data_size)
+    mux.set_ports({
+        "input": ["decoder.input"],
+        "output": ["output"]
+    })
+
+    num_gates = int(2 ** addr_size)
+
+    for i in range(num_gates):
+        mux.ports["input"].append(f"input.{i}")
+
+    mux.add([
+        Array(f"output", "node", (0, 0, -2)),
+        Decoder("decoder", addr_size),
+        [[
+            Array(f"input.{i}", "node", (0, 0, 0)),
+            Array(f"gate.{i}", "and", (0, 0, -1)),
+            Block(f"activate.{i}", "node", (data_size, 0, -1)),
+            Wire(f"decoder.output.{i}", f"activate.{i}"),
+            Wire(f"input.{i}", f"gate.{i}"),
+            Wire(f"activate.{i}", f"gate.{i}"),
+            Wire(f"gate.{i}", "output"),
+        ] for i in range(num_gates) ]
+    ])
+    # Decoder repositioning
+    input_array = cast(Array, mux.blocks.get(f"decoder.input"))
+    nor_array = cast(Array, mux.blocks.get(f"decoder.nor_gate"))
+    or_array = cast(Array, mux.blocks.get(f"decoder.or_gate"))
+    input_array.set_pos((data_size + 1, 0, 1))
+    nor_array.set_pos((data_size, 0, 1))
+    nor_array.set_info(ArrayInfo(x_step=0))
+    or_array.set_pos((data_size, 0, 1))
+    or_array.set_info(ArrayInfo(x_step=0))
+    for i in range(num_gates):
+        decoder_block = cast(Block, mux.blocks.get(f"decoder.output.{i}"))
+        decoder_block.set_pos((data_size, 0, 0))
 
     mux.move(pos)
     return mux
