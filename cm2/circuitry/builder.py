@@ -12,20 +12,21 @@ def ArrayOf(
     ) -> List[PrimitiveComponent]:
     def convert_block_to_array(_list: List[Any]) -> List[Any]:
         new_list: List[PrimitiveComponent] = []
-        for component in _list:
-            if isinstance(component, Block):
+        for _component in _list:
+            if isinstance(_component, Block):
                 new_component = Array(
-                    component.name, 
-                    component.block_id,
-                    (component.pos.x, component.pos.y, component.pos.z),
+                    _component.name, 
+                    _component.block_id,
+                    (_component.pos.x, _component.pos.y, _component.pos.z),
                     width,
                     info,
-                    component.state,
-                    component.properties)
+                    _component.state,
+                    _component.properties)
                 new_list.append(new_component)
-            elif type(component) == List[PrimitiveComponent]:
-                convert_block_to_array(component)
-            new_list.append(component)
+            elif type(_component) == List[PrimitiveComponent]:
+                convert_block_to_array(_component)
+            else:
+                new_list.append(_component)
         return new_list
     return convert_block_to_array(component)
 
