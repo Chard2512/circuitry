@@ -34,6 +34,7 @@ def _make_gate(block_id: str):
     def gate(
         name: str, 
         outputs: List[str] | str = [],
+        inputs: List[str] | str = [],
         pos: Tuple[float, float, float] = (0, 0, 0), 
         state: bool = False, 
         properties: Optional[List[str]] = None,
@@ -46,7 +47,7 @@ def _make_gate(block_id: str):
         if outputs:
             for output in outputs:
                 if delayed and output in delayed:
-                    delay_name = delay_name = f"{output[0]}._delay.{name}"
+                    delay_name = f"{output[0]}._delay.{name}"
                     components.append([
                         Block(delay_name, "delay", pos, properties=[str(delayed[output])]),
                         Wire(name, delay_name),
@@ -55,8 +56,19 @@ def _make_gate(block_id: str):
                     ])
                 else:
                     components.append(Wire(name, output))
+        if inputs:        
+            for input in inputs:
+                if delayed and input in delayed:
+                    delay_name = f"{input[0]}._delay.{name}"
+                    components.append([
+                        Block(delay_name, "delay", pos, properties=[str(delayed[input])]),
+                        Wire(input, delay_name),
+                        Wire(delay_name, name) if not inverted or (not input in inverted) else
+                        Wire(delay_name, name, inverted[input])
+                    ])
+                else:
+                    components.append(Wire(input, name))
         return components
-
     return gate
 
 # This looks horrible, but at least IDE will understand these as functions (color them).
@@ -66,219 +78,239 @@ def _make_gate(block_id: str):
 def Nor(
     name: str,
     outputs: List[str] | str = [],
+    inputs: List[str] | str = [],
     pos: Tuple[float, float, float] = (0, 0, 0),
     state: bool = False,
     properties: Optional[List[str]] = None,
     delayed: Optional[Dict[str, int]] = None,
     inverted: Optional[Dict[str, bool]] = None
 ) -> List[PrimitiveComponent]:
-    return _make_gate("nor")(name, outputs, pos, state, properties, delayed, inverted)
+    return _make_gate("nor")(name, outputs, inputs, pos, state, properties, delayed, inverted)
 
 def And(
     name: str,
     outputs: List[str] | str = [],
+    inputs: List[str] | str = [],
     pos: Tuple[float, float, float] = (0, 0, 0),
     state: bool = False,
     properties: Optional[List[str]] = None,
     delayed: Optional[Dict[str, int]] = None,
     inverted: Optional[Dict[str, bool]] = None
 ) -> List[PrimitiveComponent]:
-    return _make_gate("and")(name, outputs, pos, state, properties, delayed, inverted)
+    return _make_gate("and")(name, outputs, inputs, pos, state, properties, delayed, inverted)
 
 def Or(
     name: str,
     outputs: List[str] | str = [],
+    inputs: List[str] | str = [],
     pos: Tuple[float, float, float] = (0, 0, 0),
     state: bool = False,
     properties: Optional[List[str]] = None,
     delayed: Optional[Dict[str, int]] = None,
     inverted: Optional[Dict[str, bool]] = None
 ) -> List[PrimitiveComponent]:
-    return _make_gate("or")(name, outputs, pos, state, properties, delayed, inverted)
+    return _make_gate("or")(name, outputs, inputs, pos, state, properties, delayed, inverted)
 
 def Xor(
     name: str,
     outputs: List[str] | str = [],
+    inputs: List[str] | str = [],
     pos: Tuple[float, float, float] = (0, 0, 0),
     state: bool = False,
     properties: Optional[List[str]] = None,
     delayed: Optional[Dict[str, int]] = None,
     inverted: Optional[Dict[str, bool]] = None
 ) -> List[PrimitiveComponent]:
-    return _make_gate("xor")(name, outputs, pos, state, properties, delayed, inverted)
+    return _make_gate("xor")(name, outputs, inputs, pos, state, properties, delayed, inverted)
 
 def Button(
     name: str,
     outputs: List[str] | str = [],
+    inputs: List[str] | str = [],
     pos: Tuple[float, float, float] = (0, 0, 0),
     state: bool = False,
     properties: Optional[List[str]] = None,
     delayed: Optional[Dict[str, int]] = None,
     inverted: Optional[Dict[str, bool]] = None
 ) -> List[PrimitiveComponent]:
-    return _make_gate("button")(name, outputs, pos, state, properties, delayed, inverted)
+    return _make_gate("button")(name, outputs, inputs, pos, state, properties, delayed, inverted)
 
 def Flipflop(
     name: str,
     outputs: List[str] | str = [],
+    inputs: List[str] | str = [],
     pos: Tuple[float, float, float] = (0, 0, 0),
     state: bool = False,
     properties: Optional[List[str]] = None,
     delayed: Optional[Dict[str, int]] = None,
     inverted: Optional[Dict[str, bool]] = None
 ) -> List[PrimitiveComponent]:
-    return _make_gate("flipflop")(name, outputs, pos, state, properties, delayed, inverted)
+    return _make_gate("flipflop")(name, outputs, inputs, pos, state, properties, delayed, inverted)
 
 def Led(
     name: str,
     outputs: List[str] | str = [],
+    inputs: List[str] | str = [],
     pos: Tuple[float, float, float] = (0, 0, 0),
     state: bool = False,
     properties: Optional[List[str]] = None,
     delayed: Optional[Dict[str, int]] = None,
     inverted: Optional[Dict[str, bool]] = None
 ) -> List[PrimitiveComponent]:
-    return _make_gate("led")(name, outputs, pos, state, properties, delayed, inverted)
+    return _make_gate("led")(name, outputs, inputs, pos, state, properties, delayed, inverted)
 
 def Sound(
     name: str,
     outputs: List[str] | str = [],
+    inputs: List[str] | str = [],
     pos: Tuple[float, float, float] = (0, 0, 0),
     state: bool = False,
     properties: Optional[List[str]] = None,
     delayed: Optional[Dict[str, int]] = None,
     inverted: Optional[Dict[str, bool]] = None
 ) -> List[PrimitiveComponent]:
-    return _make_gate("sound")(name, outputs, pos, state, properties, delayed, inverted)
+    return _make_gate("sound")(name, outputs, inputs, pos, state, properties, delayed, inverted)
 
 def Conductor(
     name: str,
     outputs: List[str] | str = [],
+    inputs: List[str] | str = [],
     pos: Tuple[float, float, float] = (0, 0, 0),
     state: bool = False,
     properties: Optional[List[str]] = None,
     delayed: Optional[Dict[str, int]] = None,
     inverted: Optional[Dict[str, bool]] = None
 ) -> List[PrimitiveComponent]:
-    return _make_gate("conductor")(name, outputs, pos, state, properties, delayed, inverted)
+    return _make_gate("conductor")(name, outputs, inputs, pos, state, properties, delayed, inverted)
 
 def Custom(
     name: str,
     outputs: List[str] | str = [],
+    inputs: List[str] | str = [],
     pos: Tuple[float, float, float] = (0, 0, 0),
     state: bool = False,
     properties: Optional[List[str]] = None,
     delayed: Optional[Dict[str, int]] = None,
     inverted: Optional[Dict[str, bool]] = None
 ) -> List[PrimitiveComponent]:
-    return _make_gate("custom")(name, outputs, pos, state, properties, delayed, inverted)
+    return _make_gate("custom")(name, outputs, inputs, pos, state, properties, delayed, inverted)
 
 def Nand(
     name: str,
     outputs: List[str] | str = [],
+    inputs: List[str] | str = [],
     pos: Tuple[float, float, float] = (0, 0, 0),
     state: bool = False,
     properties: Optional[List[str]] = None,
     delayed: Optional[Dict[str, int]] = None,
     inverted: Optional[Dict[str, bool]] = None
 ) -> List[PrimitiveComponent]:
-    return _make_gate("nand")(name, outputs, pos, state, properties, delayed, inverted)
+    return _make_gate("nand")(name, outputs, inputs, pos, state, properties, delayed, inverted)
 
 def Xnor(
     name: str,
     outputs: List[str] | str = [],
+    inputs: List[str] | str = [],
     pos: Tuple[float, float, float] = (0, 0, 0),
     state: bool = False,
     properties: Optional[List[str]] = None,
     delayed: Optional[Dict[str, int]] = None,
     inverted: Optional[Dict[str, bool]] = None
 ) -> List[PrimitiveComponent]:
-    return _make_gate("xnor")(name, outputs, pos, state, properties, delayed, inverted)
+    return _make_gate("xnor")(name, outputs, inputs, pos, state, properties, delayed, inverted)
 
 def Random(
     name: str,
     outputs: List[str] | str = [],
+    inputs: List[str] | str = [],
     pos: Tuple[float, float, float] = (0, 0, 0),
     state: bool = False,
     properties: Optional[List[str]] = None,
     delayed: Optional[Dict[str, int]] = None,
     inverted: Optional[Dict[str, bool]] = None
 ) -> List[PrimitiveComponent]:
-    return _make_gate("random")(name, outputs, pos, state, properties, delayed, inverted)
+    return _make_gate("random")(name, outputs, inputs, pos, state, properties, delayed, inverted)
 
 def Text(
     name: str,
     outputs: List[str] | str = [],
+    inputs: List[str] | str = [],
     pos: Tuple[float, float, float] = (0, 0, 0),
     state: bool = False,
     properties: Optional[List[str]] = None,
     delayed: Optional[Dict[str, int]] = None,
     inverted: Optional[Dict[str, bool]] = None
 ) -> List[PrimitiveComponent]:
-    return _make_gate("text")(name, outputs, pos, state, properties, delayed, inverted)
+    return _make_gate("text")(name, outputs, inputs, pos, state, properties, delayed, inverted)
 
 def Tile(
     name: str,
     outputs: List[str] | str = [],
+    inputs: List[str] | str = [],
     pos: Tuple[float, float, float] = (0, 0, 0),
     state: bool = False,
     properties: Optional[List[str]] = None,
     delayed: Optional[Dict[str, int]] = None,
     inverted: Optional[Dict[str, bool]] = None
 ) -> List[PrimitiveComponent]:
-    return _make_gate("tile")(name, outputs, pos, state, properties, delayed, inverted)
+    return _make_gate("tile")(name, outputs, inputs, pos, state, properties, delayed, inverted)
 
 def Node(
     name: str,
     outputs: List[str] | str = [],
+    inputs: List[str] | str = [],
     pos: Tuple[float, float, float] = (0, 0, 0),
     state: bool = False,
     properties: Optional[List[str]] = None,
     delayed: Optional[Dict[str, int]] = None,
     inverted: Optional[Dict[str, bool]] = None
 ) -> List[PrimitiveComponent]:
-    return _make_gate("node")(name, outputs, pos, state, properties, delayed, inverted)
+    return _make_gate("node")(name, outputs, inputs, pos, state, properties, delayed, inverted)
 
 def Delay(
     name: str,
     outputs: List[str] | str = [],
+    inputs: List[str] | str = [],
     pos: Tuple[float, float, float] = (0, 0, 0),
     state: bool = False,
     properties: Optional[List[str]] = None,
     delayed: Optional[Dict[str, int]] = None,
     inverted: Optional[Dict[str, bool]] = None
 ) -> List[PrimitiveComponent]:
-    return _make_gate("delay")(name, outputs, pos, state, properties, delayed, inverted)
+    return _make_gate("delay")(name, outputs, inputs, pos, state, properties, delayed, inverted)
 
 def Antenna(
     name: str,
     outputs: List[str] | str = [],
+    inputs: List[str] | str = [],
     pos: Tuple[float, float, float] = (0, 0, 0),
     state: bool = False,
     properties: Optional[List[str]] = None,
     delayed: Optional[Dict[str, int]] = None,
     inverted: Optional[Dict[str, bool]] = None
 ) -> List[PrimitiveComponent]:
-    return _make_gate("antenna")(name, outputs, pos, state, properties, delayed, inverted)
+    return _make_gate("antenna")(name, outputs, inputs, pos, state, properties, delayed, inverted)
 
 def ConductorV2(
     name: str,
     outputs: List[str] | str = [],
+    inputs: List[str] | str = [],
     pos: Tuple[float, float, float] = (0, 0, 0),
     state: bool = False,
     properties: Optional[List[str]] = None,
     delayed: Optional[Dict[str, int]] = None,
     inverted: Optional[Dict[str, bool]] = None
 ) -> List[PrimitiveComponent]:
-    return _make_gate("conductor_v2")(name, outputs, pos, state, properties, delayed, inverted)
+    return _make_gate("conductor_v2")(name, outputs, inputs, pos, state, properties, delayed, inverted)
 
 def LedMixer(
     name: str,
     outputs: List[str] | str = [],
+    inputs: List[str] | str = [],
     pos: Tuple[float, float, float] = (0, 0, 0),
     state: bool = False,
     properties: Optional[List[str]] = None,
     delayed: Optional[Dict[str, int]] = None,
     inverted: Optional[Dict[str, bool]] = None
 ) -> List[PrimitiveComponent]:
-    return _make_gate("led_mixer")(name, outputs, pos, state, properties, delayed, inverted)
+    return _make_gate("led_mixer")(name, outputs, inputs, pos, state, properties, delayed, inverted)
