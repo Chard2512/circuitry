@@ -238,3 +238,38 @@ def jsons_to_module(filepaths: List[str]) -> Dict[str, Module]:
         compiled_modules.update(child_compiled_modules)
         
     return compiled_modules
+
+def module_to_python(module: Module, savepath: str):
+    """
+    Writes a circuitry python function from a module    
+    """
+
+    content = f"""from cm2.circuitry.core import *
+    
+def {module.name}(name: str, pos: Tuple[float, float, float] = (0, 0, 0)):
+    m = Module(name)
+    m.set_ports({{
+        "input": [{("input" in module.ports) and ", ".join([f"\"{input}\"" for input in module.get_port("input")]) or ""}],
+        "output": [{("output" in module.ports) and ", ".join([f"\"{output}\"" for output in module.get_port("output")]) or ""}]
+    }})
+
+    m.add([
+"""
+    for block in module.get_blocks():
+        content += f"        Block(\"{block.name}\", \"{block.block_id}\", {int(block.pos.x), int(block.pos.y), int(block.pos.z)}"
+        if block.state:
+            content += ", state=True"
+        if block.properties:
+            content += f", properties={block.properties}"
+            
+        content += "),\n"
+    for wire in module.get_wires():
+        content += f"        Wire(\"{wire.src}\", \"{wire.dst}\"),\n"
+    content += """    ])
+    m.move(pos)
+    return m
+    """
+    
+    
+    with open(savepath, "w") as file:
+        file.write(content)
