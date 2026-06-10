@@ -75,6 +75,7 @@ class BuildingData(Enum):
     HUGE_MEMORY = MappingProxyType({
         "name": "HugeMemory", 
         "nwires": 49, 
+        "pos_offset": (17, 0, -3),
         "address_index": 0,
         "address_width": 16,
         "output_index": 16,
@@ -146,12 +147,12 @@ class Vector3:
     
 @dataclass
 class CFrame:
-    pos: Vector3 | Tuple[float, float, float]
+    pos: Vector3
     rot: List[List[float]] = field(default_factory=lambda: [[0, 0, -1], [0, 1, 0], [1, 0, 0]])
 
-    def __post_init__(self):
-        if isinstance(self.pos, Tuple):
-            self.pos = Vector3(*self.pos)
+    #def __post_init__(self):
+    #    if isinstance(self.pos, Tuple):
+    #        self.pos = Vector3(*self.pos)
 
     @staticmethod
     def identity_matrix():
@@ -394,18 +395,24 @@ class Building():
         self, 
         name: str, 
         building_type: str, 
-        pos: Tuple[float, float, float], # Not implemented
+        #pos: Tuple[float, float, float], # Not implemented
         cframe: CFrame | Tuple[float, float, float],
         nwires: int = 0
     ):
         if isinstance(cframe, Tuple):
-            cframe = CFrame(cframe)
+            cframe = CFrame(Vector3(*cframe))
         self.name = name
-        self.pos = Vector3(*pos)
+        #self.pos = Vector3(*pos)
         self.building_type = building_type
-        self.cframe: CFrame = cframe
+
         if str.upper(self.building_type) in BuildingData.__members__:
-            nwires = int(BuildingData[str.upper(self.building_type)].value["nwires"])
+            pos_offset = cast(Tuple[int, int, int], BuildingData[str.upper(self.building_type)].value["pos_offset"])
+            cframe = CFrame(
+                cframe.pos + Vector3(*pos_offset),
+                cframe.rot
+            )
+            nwires = cast(int, BuildingData[str.upper(self.building_type)].value["nwires"])
+        self.cframe = cframe
         self.wires: List[List[BuildingWire]] = [[] for _ in range(nwires)]
 
     def set_pos(self, pos: Tuple[float, float, float]):
@@ -413,8 +420,8 @@ class Building():
 
     def add_wire(self, building_wire: 'BuildingWire'):
         if isinstance(building_wire.index, str):
-            index = int(BuildingData[str.upper(self.building_type)].value[f"{building_wire.index}_index"])
-            width = int(BuildingData[str.upper(self.building_type)].value[f"{building_wire.index}_width"])
+            index = cast(int, BuildingData[str.upper(self.building_type)].value[f"{building_wire.index}_index"])
+            width = cast(int, BuildingData[str.upper(self.building_type)].value[f"{building_wire.index}_width"])
 
             arrange = [str(i) for i in range(1, width + 1, 1)]
             arrange = sorted(arrange)
@@ -652,45 +659,69 @@ class Module:
 
     def auto_place(self):
         '''Auto place blocks based on ports'''
+        arrival_times = self.get_arrival_times()
+        
+        not_port_arrival_times: Dict[str, int] = {}
+        for block, arrival_time in arrival_times.items():
+            if (not ("input" in self.ports and block in flatten_recursive(self.ports["input"]))
+                and not ("output" in self.ports and block in flatten_recursive(self.ports["output"]))):
+                not_port_arrival_times[block] = arrival_time        
+        
+        num_blocks = len(not_port_arrival_times)
+        num_inputs = ("input" in self.ports and len(flatten_recursive(self.ports["input"])) or 0)
+        num_outputs = ("output" in self.ports and len(flatten_recursive(self.ports["output"])) or 0)
+        num_input_groups = 0
+        num_output_groups = 0
+        if "input" in self.ports:
+            for item in self.ports["input"]:
+                if isinstance(item, list):
+                    num_input_groups += 1
+        if "output" in self.ports:
+            for item in self.ports["output"]:
+                if isinstance(item, list):
+                    num_output_groups += 1
+                    
+        max_port_side = max(num_inputs + num_input_groups - 1, num_outputs + num_output_groups - 1)            
+                    
         i = 0
-
-        for block in self.blocks.values():
-            block.set_pos((0, 0, 0))
+        for block, _ in sorted(not_port_arrival_times.items(), key=lambda item: item[1]):
+            self.blocks[block].set_pos((i % max_port_side, 0, -(1 + i // max_port_side)))
+            i += 1
 
         if "input" in self.ports:
             i = 0
             for port in self.ports["input"]:
+                j = 0
                 if isinstance(port, list):
-                    j = 0
                     # This is because hdl.py:parse_json_module generates reversed port blocks
                     _port = cast(List[str], port[::-1])
                     for p in _port:
                         block = self.get_block(p)
                         assert block, f"Block '{p}' from input port doesn't exist"
-                        block.set_pos((j, i, 1))
+                        block.set_pos((j + i, 0, 0))
                         j += 1
                 else: # str
                     block = self.get_block(port)
                     assert block, f"Block '{port}' from input port doesn't exist"
-                    block.set_pos((0, i, 1))
-                i += 1
+                    block.set_pos((i, 0, 0))
+                i += 1 + j
                 
         if "output" in self.ports:
             i = 0
             for port in self.ports["output"]:
+                j = 0
                 if isinstance(port, list):
-                    j = 0
                     _port = cast(List[str], port[::-1])
                     for p in _port:
                         block = self.get_block(p)
                         assert block, f"Block '{p}' from output port doesn't exist"
-                        block.set_pos((j, i, -1))
+                        block.set_pos((j + i, 0, -(2 + (num_blocks - 1) // max_port_side)))
                         j += 1
                 else: # str
                     block = self.get_block(port)
                     assert block, f"Block '{port}' from output port doesn't exist"
-                    block.set_pos((0, i, -1))
-                i += 1
+                    block.set_pos((i, 0, -(2 + (num_blocks - 1) // max_port_side)))
+                i += 1 + j
 
     def auto_balance(self) -> int:
         """This ensures all paths from any input to any output takes the same number of ticks"""
@@ -698,7 +729,8 @@ class Module:
         assert "output" in self.ports, "Module doesn't have output port defined"
         
         arrival_times: Dict[str, int] = {} # cache get_arrival_time results
-        
+        visiting: set[str] = set()
+      
         graph = self.get_block_graph()
         module_outputs: List[str] = []
         for outputs in self.get_port("output"):
@@ -712,26 +744,42 @@ class Module:
         def get_arrival_time(block: Block) -> int:
             if block.name in arrival_times:
                 return arrival_times[block.name]
+           
+            if block.name in visiting:
+                return 0
+            
+            visiting.add(block.name)
+            
+            self_delay: int
+            if block.block_id == "node":
+                self_delay = 0
+            elif block.block_id == "delay":
+                assert block.properties
+                self_delay = int(block.properties[0])
             else:
-                times = get_input_arrival_times(block)
-                if len(times) == 0:
-                    arrival_times[block.name] = 0
-                    return 0
-                else:
-                    time = max(times.values())
-                    arrival_times[block.name] = time
-                    return time
+                self_delay = 1
+
+            times = get_input_arrival_times(block)
+            if len(times) == 0:
+                result = self_delay
+            else:
+                result = max(times.values()) + self_delay
+
+            visiting.discard(block.name)
+            arrival_times[block.name] = result 
+            return result
        
         def get_input_arrival_times(block: Block) -> Dict[str, int]:
             inputs = graph[block.name]["inputs"]
             times: Dict[str, int] = {}
             for i in inputs:
-                times[i["block"].name] = get_arrival_time(i["block"]) + 1
+                if (not block.name in [input_entry["block"].name for input_entry in i["inputs"]]):
+                    times[i["block"].name] = get_arrival_time(i["block"])
             return times
             
         def insert_input_delays(block: Block) -> int:
             times = get_input_arrival_times(block)
-            slowest = get_arrival_time(block)
+            slowest = (len(times) > 0 and max(times.values()) or 0)
             
             for input_name, time in times.items():
                 delay = slowest - time
@@ -768,7 +816,67 @@ class Module:
                     block.properties = [f"{delay}"]
                     
         return slowest_output_arrival_time
+                   
+    def get_arrival_times(self) -> Dict[str, int]:               
+        assert "input" in self.ports, "Module doesn't have input port defined"
+        assert "output" in self.ports, "Module doesn't have output port defined"
+        
+        arrival_times: Dict[str, int] = {} # cache get_arrival_time results
+        visiting: set[str] = set()
+        
+        graph = self.get_block_graph()
+        module_outputs: List[str] = []
+        for outputs in self.get_port("output"):
+            _outputs = flatten_recursive(outputs)
+            for p in _outputs:
+                expanded = self.get_blocks_expanded(p)
+                if expanded:
+                    for block in expanded:
+                        module_outputs.append(block.name) 
+            
+        def get_arrival_time(block: Block) -> int:
+            if block.name in arrival_times:
+                return arrival_times[block.name]
+            
+            if block.name in visiting:
+                return 0
+            
+            visiting.add(block.name)
+            
+            self_delay: int
+            if block.block_id == "node":
+                self_delay = 0
+            elif block.block_id == "delay":
+                assert block.properties
+                self_delay = int(block.properties[0])
+            else:
+                self_delay = 1
+            
+            times = get_input_arrival_times(block)
+
+            if len(times) == 0:
+                result = 0
+            else:
+                result = max(times.values()) + self_delay
+            
+            arrival_times[block.name] = result
+            visiting.discard(block.name)
+            return result
+       
+        def get_input_arrival_times(block: Block) -> Dict[str, int]:
+            inputs = graph[block.name]["inputs"]
+            times: Dict[str, int] = {}
+            for i in inputs:  
+                times[i["block"].name] = get_arrival_time(i["block"])
+            return times
+        
+        nodes = graph.keys()
+        for node in nodes:
+            content = graph[node]
+            get_arrival_time(content["block"])
                     
+        return arrival_times
+              
     def def_ic(self):
         """Put IC terminals on module"""
         assert "input" in self.ports, "Module doesn't have input port defined"
