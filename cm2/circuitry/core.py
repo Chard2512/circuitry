@@ -76,14 +76,12 @@ class BuildingData(Enum):
         "name": "HugeMemory", 
         "nwires": 49, 
         "pos_offset": (17, 0, -3),
-        "address_index": 0,
-        "address_width": 16,
-        "output_index": 16,
-        "output_width": 16,
-        "value_index": 32,
-        "value_width": 16,
-        "write_index": 48,
-        "write_width": 1,
+        "indexes": {
+            "address": 0,
+            "output": 16,
+            "value": 32,
+            "write": 48
+        }
     })
 
 class Port(IntEnum):
