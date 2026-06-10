@@ -33,7 +33,7 @@ gate_map: Dict[str, Any] = {
     "$_DFF_P_": DFFP
 }
 
-def parse_json_module(name: str, json_module: Dict[str, Any]) -> Module:
+def parse_json_module(name: str, json_module: Dict[str, Any], auto_balance: bool) -> Module:
     ports = json_module["ports"]
     cells = json_module["cells"]
 
@@ -206,10 +206,12 @@ def parse_json_module(name: str, json_module: Dict[str, Any]) -> Module:
                     ])   
 
     m.add(components)
+    if auto_balance:
+        m.auto_balance()
     m.auto_place()
     return m
 
-def json_to_module(filepath: str) -> Dict[str, Module]:
+def json_to_module(filepath: str, auto_balance: bool = False) -> Dict[str, Module]:
     """
     Compiles json hdl to Module
     """
@@ -222,7 +224,7 @@ def json_to_module(filepath: str) -> Dict[str, Module]:
     modules = jsonhdl["modules"]
 
     for module_name, module in modules.items():
-        compiled_modules[module_name] = parse_json_module(module_name, module)
+        compiled_modules[module_name] = parse_json_module(module_name, module, auto_balance)
 
     return compiled_modules
 
@@ -249,8 +251,8 @@ def module_to_python(module: Module, savepath: str):
 def {module.name}(name: str, pos: Tuple[float, float, float] = (0, 0, 0)):
     m = Module(name)
     m.set_ports({{
-        "input": [{("input" in module.ports) and ", ".join([f"\"{input}\"" for input in module.get_port("input")]) or ""}],
-        "output": [{("output" in module.ports) and ", ".join([f"\"{output}\"" for output in module.get_port("output")]) or ""}]
+        "input": [{("input" in module.ports) and ", ".join([str(input) for input in module.get_port("input")]) or ""}],
+        "output": [{("output" in module.ports) and ", ".join([str(output) for output in module.get_port("output")]) or ""}]
     }})
 
     m.add([
