@@ -404,13 +404,15 @@ class Building():
         #self.pos = Vector3(*pos)
         self.building_type = building_type
 
-        if str.upper(self.building_type) in BuildingData.__members__:
-            pos_offset = cast(Tuple[int, int, int], BuildingData[str.upper(self.building_type)].value["pos_offset"])
-            cframe = CFrame(
-                cframe.pos + Vector3(*pos_offset),
-                cframe.rot
-            )
-            nwires = cast(int, BuildingData[str.upper(self.building_type)].value["nwires"])
+        assert str.upper(self.building_type) in BuildingData.__members__, "Building type does not exists"
+
+        pos_offset = cast(Tuple[int, int, int], BuildingData[str.upper(self.building_type)].value["pos_offset"])
+        cframe = CFrame(
+            cframe.pos + Vector3(*pos_offset),
+            cframe.rot
+        )
+        nwires = cast(int, BuildingData[str.upper(self.building_type)].value["nwires"])
+            
         self.cframe = cframe
         self.wires: List[List[BuildingWire]] = [[] for _ in range(nwires)]
 
