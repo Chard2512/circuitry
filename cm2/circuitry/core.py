@@ -395,7 +395,6 @@ class Building():
         self, 
         name: str, 
         building_type: str, 
-        #pos: Tuple[float, float, float], # Not implemented
         cframe: CFrame | Tuple[float, float, float],
         nwires: int = 0
     ):
